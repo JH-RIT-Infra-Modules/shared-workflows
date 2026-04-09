@@ -4,27 +4,62 @@ on:
   pull_request:
     branches:
       - main
+      - develop
+      - 'release/**'
+      - 'feature/**'
   push:
     branches:
       - main
+      - develop
+      - 'release/**'
+      - 'feature/**'
   workflow_dispatch:
+    inputs:
+      environments:
+        description: 'Environments to validate (comma-separated: dev,test,stage,prod or "all")'
+        required: false
+        type: string
+        default: 'all'
 
 env:
   TF_VERSION: "1.5.0"
-  ARM_CLIENT_ID: ${{ secrets.ARM_CLIENT_ID }}
-  ARM_CLIENT_SECRET: ${{ secrets.ARM_CLIENT_SECRET }}
-  ARM_SUBSCRIPTION_ID: ${{ secrets.ARM_SUBSCRIPTION_ID }}
-  ARM_TENANT_ID: ${{ secrets.ARM_TENANT_ID }}
-  BACKEND_RESOURCE_GROUP: ${{ secrets.BACKEND_RESOURCE_GROUP }}
-  BACKEND_STORAGE_ACCOUNT: ${{ secrets.BACKEND_STORAGE_ACCOUNT }}
-  BACKEND_CONTAINER_NAME: ${{ secrets.BACKEND_CONTAINER_NAME }}
-  BACKEND_KEY: ${{ secrets.BACKEND_KEY }}
 
 jobs:
-  validate:
-    name: Terraform Validate
+  # Parse the environments input
+  setup:
+    name: Setup
     runs-on: ubuntu-latest
+    outputs:
+      environments: ${{ steps.parse-envs.outputs.environments }}
     steps:
+      - name: Parse Environments
+        id: parse-envs
+        run: |
+          INPUT="${{ inputs.environments || 'all' }}"
+          if [ "$INPUT" == "all" ] || [ -z "$INPUT" ]; then
+            ENVS='["dev","test","stage","prod"]'
+          else
+            # Convert comma-separated to JSON array
+            ENVS=$(echo "$INPUT" | tr ',' '\n' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//' | sed 's/^/"/;s/$/"/' | tr '\n' ',' | sed 's/,$//' | sed 's/^/[/;s/$/]/')
+          fi
+          echo "environments=$ENVS" >> $GITHUB_OUTPUT
+          echo "🎯 Environments to validate: $ENVS"
+
+  validate:
+    name: Validate (${{ matrix.environment }})
+    runs-on: ubuntu-latest
+    needs: setup
+    strategy:
+      fail-fast: false
+      max-parallel: 4
+      matrix:
+        environment: ${{ fromJson(needs.setup.outputs.environments) }}
+    environment: ${{ matrix.environment }}
+    steps:
+      - name: Display Environment Info
+        run: |
+          echo "🔍 Validating environment: ${{ matrix.environment }}"
+
       - name: Checkout code
         uses: actions/checkout@v3
 
@@ -35,13 +70,12 @@ jobs:
 
       - name: Debug Secrets (check if set)
         run: |
-          echo "Tenant ID length: ${#ARM_TENANT_ID}"
-          echo "Client ID length: ${#ARM_CLIENT_ID}"
-          echo "Subscription ID length: ${#ARM_SUBSCRIPTION_ID}"
-          echo "Client Secret length: ${#ARM_CLIENT_SECRET}"
-          if [ -z "$ARM_TENANT_ID" ]; then echo "TENANT_ID IS EMPTY"; fi
-          if [ -z "$ARM_CLIENT_ID" ]; then echo "CLIENT_ID IS EMPTY"; fi
-          
+          echo "Environment: ${{ matrix.environment }}"
+          echo "Tenant ID set: ${{ secrets.ARM_TENANT_ID != '' }}"
+          echo "Client ID set: ${{ secrets.ARM_CLIENT_ID != '' }}"
+          echo "Subscription ID set: ${{ secrets.ARM_SUBSCRIPTION_ID != '' }}"
+          echo "Client Secret set: ${{ secrets.ARM_CLIENT_SECRET != '' }}"
+
       - name: Azure Login
         uses: azure/login@v2
         with:
@@ -54,17 +88,31 @@ jobs:
         run: tflint --init
 
       - name: Run TFLint
-        run: tflint -f compact
+        run: |
+          echo "🔎 Running TFLint for ${{ matrix.environment }}..."
+          tflint -f compact
+
       - name: Terraform Init
         run: |
           terraform init \
-            -backend-config="resource_group_name=${{ env.BACKEND_RESOURCE_GROUP }}" \
-            -backend-config="storage_account_name=${{ env.BACKEND_STORAGE_ACCOUNT }}" \
-            -backend-config="container_name=${{ env.BACKEND_CONTAINER_NAME }}" \
-            -backend-config="key=${{ env.BACKEND_KEY }}"
+            -backend-config="resource_group_name=${{ secrets.BACKEND_RESOURCE_GROUP }}" \
+            -backend-config="storage_account_name=${{ secrets.BACKEND_STORAGE_ACCOUNT }}" \
+            -backend-config="container_name=${{ secrets.BACKEND_CONTAINER_NAME }}" \
+            -backend-config="key=${{ secrets.BACKEND_KEY }}"
 
       - name: Terraform Format Check
-        run: terraform fmt -check -recursive
+        run: |
+          echo "📝 Checking Terraform formatting..."
+          terraform fmt -check -recursive
 
       - name: Terraform Validate
-        run: terraform validate
+        run: |
+          echo "✅ Validating Terraform configuration for ${{ matrix.environment }}..."
+          if [ -f "environments/${{ matrix.environment }}.tfvars" ]; then
+            terraform validate
+            echo "📁 Environment-specific tfvars file found: environments/${{ matrix.environment }}.tfvars"
+          else
+            terraform validate
+            echo "ℹ️  No environment-specific tfvars file found, using defaults"
+          fi
+          echo "✅ Validation complete for ${{ matrix.environment }}"

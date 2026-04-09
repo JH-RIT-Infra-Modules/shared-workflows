@@ -1,0 +1,60 @@
+name: Mirror Sync
+
+on:
+  schedule:
+    - cron: '*/10 * * * *'
+  workflow_dispatch:
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Setup SSH
+        uses: webfactory/ssh-agent@v0.8.0
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+
+      - name: Configure git
+        run: |
+          git config --global user.email "action@github.com"
+          git config --global user.name "GitHub Action"
+          mkdir -p ~/.ssh
+          ssh-keyscan github.com >> ~/.ssh/known_hosts
+
+      - name: Checkout mirror repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Backup custom workflows
+        run: |
+          mkdir -p /tmp/custom-workflows
+          if [ -d .github/workflows ]; then
+            cp -r .github/workflows/* /tmp/custom-workflows/ || true
+          fi
+
+      - name: Sync from upstream
+        run: |
+          # Add upstream remote
+          git remote add upstream git@github.com:govex/govex-knowledge-slackbot.git || git remote set-url upstream git@github.com:govex/govex-knowledge-slackbot.git
+          
+          # Fetch all upstream branches and tags
+          git fetch upstream --tags --force
+          
+          # Reset local main to match upstream main
+          git checkout main
+          git reset --hard upstream/main
+
+      - name: Restore custom workflows
+        run: |
+          if [ -d /tmp/custom-workflows ] && [ "$(ls -A /tmp/custom-workflows)" ]; then
+            mkdir -p .github/workflows
+            cp -r /tmp/custom-workflows/* .github/workflows/
+          fi
+
+      - name: Commit and push
+        run: |
+          git add .github/workflows/ || true
+          git diff --staged --quiet || git commit -m "Preserve custom workflows from mirror"
+          git push --force origin main
+          git push --force --tags origin

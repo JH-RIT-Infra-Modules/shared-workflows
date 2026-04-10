@@ -101,7 +101,7 @@ jobs:
       - name: Run TFLint
         run: |
           echo "🔎 Running TFLint for ${{ matrix.environment }}..."
-          tflint -f compact
+          tflint -f compact --minimum-failure-severity=error
 
       - name: Terraform Init
         run: |

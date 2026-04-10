@@ -19,7 +19,7 @@ on:
         type: string
         default: '1.5.0'
       tf_vars:
-        description: 'JSON object of TF_VAR_ environment variables (e.g., {"TF_VAR_foo": "bar"})'
+        description: 'JSON object of TF_VAR_ environment variables (e.g., {"foo": "bar"})'
         required: false
         type: string
         default: '{}'
@@ -114,7 +114,7 @@ jobs:
       - name: Set TF_VAR environment variables
         run: |
           if [ '${{ inputs.tf_vars }}' != '{}' ]; then
-            echo '${{ inputs.tf_vars }}' | jq -r 'to_entries[] | "\(.key)=\(.value)"' >> $GITHUB_ENV
+            echo '${{ inputs.tf_vars }}' | jq -r 'to_entries[] | "TF_VAR_\(.key)=\(.value)"' >> $GITHUB_ENV
           fi
 
       - name: Terraform Init
@@ -207,7 +207,7 @@ jobs:
       - name: Set TF_VAR environment variables
         run: |
           if [ '${{ inputs.tf_vars }}' != '{}' ]; then
-            echo '${{ inputs.tf_vars }}' | jq -r 'to_entries[] | "\(.key)=\(.value)"' >> $GITHUB_ENV
+            echo '${{ inputs.tf_vars }}' | jq -r 'to_entries[] | "TF_VAR_\(.key)=\(.value)"' >> $GITHUB_ENV
           fi
 
       - name: Terraform Init

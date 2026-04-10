@@ -16,6 +16,11 @@ on:
         required: false
         type: string
         default: '1.5.0'
+      tf_vars:
+        description: 'JSON object of TF_VAR_ environment variables (e.g., {"TF_VAR_foo": "bar"})'
+        required: false
+        type: string
+        default: '{}'
     secrets:
       ARM_CLIENT_ID:
         required: true
@@ -107,6 +112,12 @@ jobs:
         uses: azure/login@v2
         with:
           creds: '{"clientId":"${{ secrets.ARM_CLIENT_ID }}","clientSecret":"${{ secrets.ARM_CLIENT_SECRET }}","subscriptionId":"${{ secrets.ARM_SUBSCRIPTION_ID }}","tenantId":"${{ secrets.ARM_TENANT_ID }}"}'
+
+      - name: Set TF_VAR environment variables
+        run: |
+          if [ '${{ inputs.tf_vars }}' != '{}' ]; then
+            echo '${{ inputs.tf_vars }}' | jq -r 'to_entries[] | "\(.key)=\(.value)"' >> $GITHUB_ENV
+          fi
 
       - name: Terraform Init
         run: |

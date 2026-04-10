@@ -13,6 +13,11 @@ on:
         required: false
         type: string
         default: '1.5.0'
+      tf_vars:
+        description: 'JSON object of TF_VAR_ environment variables (e.g., {"TF_VAR_foo": "bar"})'
+        required: false
+        type: string
+        default: '{}'
     secrets:
       ARM_CLIENT_ID:
         required: true
@@ -118,6 +123,12 @@ jobs:
         run: |
           echo "🔎 Running TFLint for ${{ matrix.environment }}..."
           tflint -f compact --minimum-failure-severity=error
+
+      - name: Set TF_VAR environment variables
+        run: |
+          if [ '${{ inputs.tf_vars }}' != '{}' ]; then
+            echo '${{ inputs.tf_vars }}' | jq -r 'to_entries[] | "\(.key)=\(.value)"' >> $GITHUB_ENV
+          fi
 
       - name: Terraform Init
         run: |

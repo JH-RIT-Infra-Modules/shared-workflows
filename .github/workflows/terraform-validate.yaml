@@ -12,12 +12,16 @@ on:
         description: 'Terraform version to use'
         required: false
         type: string
-        default: '1.5.0'
+        default: '1.14.5'
       tf_vars:
         description: 'JSON object of TF_VAR_ environment variables (e.g., {"foo": "bar"})'
         required: false
         type: string
         default: '{}'
+      azure_keyvault_name:
+        description: 'Name of the Azure Key Vault containing secrets'
+        required: true
+        type: string
     secrets:
       ARM_CLIENT_ID:
         required: true
@@ -42,6 +46,7 @@ on:
 
 env:
   TF_VERSION: ${{ inputs.terraform_version }}
+  AZURE_KEYVAULT_NAME: ${{ inputs.azure_keyvault_name }}
 
 jobs:
   # Parse the environments input
@@ -83,6 +88,29 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
 
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          creds: '{"clientId":"${{ secrets.ARM_CLIENT_ID }}","clientSecret":"${{ secrets.ARM_CLIENT_SECRET }}","subscriptionId":"${{ secrets.ARM_SUBSCRIPTION_ID }}","tenantId":"${{ secrets.ARM_TENANT_ID }}"}''
+
+      - name: Fetch Secrets from Azure Key Vault
+        id: keyvault
+        uses: azure/CLI@v1
+        with:
+          inlineScript: |
+            # Fetch all secrets from Key Vault
+            SECRETS=$(az keyvault secret list --vault-name "${{ env.AZURE_KEYVAULT_NAME }}" --query "[].name" -o tsv)
+            
+            for SECRET_NAME in $SECRETS; do
+              # Convert secret name to environment variable format (uppercase, replace hyphens with underscores)
+              ENV_VAR_NAME=$(echo "$SECRET_NAME" | tr '[:lower:]' '[:upper:]' | tr '-' '_')
+              SECRET_VALUE=$(az keyvault secret show --vault-name "${{ env.AZURE_KEYVAULT_NAME }}" --name "$SECRET_NAME" --query "value" -o tsv)
+              echo "${ENV_VAR_NAME}=${SECRET_VALUE}" >> $GITHUB_ENV
+              # Mask the secret in logs
+              echo "::add-mask::${SECRET_VALUE}"
+            done
+            echo "✅ Secrets loaded from Key Vault: ${{ env.AZURE_KEYVAULT_NAME }}"
+
       - name: Generate GitHub App Token
         id: app-token
         uses: actions/create-github-app-token@v1
@@ -99,19 +127,6 @@ jobs:
         uses: hashicorp/setup-terraform@v2
         with:
           terraform_version: ${{ env.TF_VERSION }}
-
-      - name: Debug Secrets (check if set)
-        run: |
-          echo "Environment: ${{ matrix.environment }}"
-          echo "Tenant ID set: ${{ secrets.ARM_TENANT_ID != '' }}"
-          echo "Client ID set: ${{ secrets.ARM_CLIENT_ID != '' }}"
-          echo "Subscription ID set: ${{ secrets.ARM_SUBSCRIPTION_ID != '' }}"
-          echo "Client Secret set: ${{ secrets.ARM_CLIENT_SECRET != '' }}"
-
-      - name: Azure Login
-        uses: azure/login@v2
-        with:
-          creds: '{"clientId":"${{ secrets.ARM_CLIENT_ID }}","clientSecret":"${{ secrets.ARM_CLIENT_SECRET }}","subscriptionId":"${{ secrets.ARM_SUBSCRIPTION_ID }}","tenantId":"${{ secrets.ARM_TENANT_ID }}"}'
 
       - name: Setup TFLint
         uses: terraform-linters/setup-tflint@v3

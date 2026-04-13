@@ -26,6 +26,11 @@ on:
         required: false
         type: string
         default: ''
+      terraform_directory:
+        description: 'Directory containing Terraform configuration files'
+        required: false
+        type: string
+        default: '.'
     secrets:
       ARM_CLIENT_ID:
         required: true
@@ -92,6 +97,7 @@ jobs:
       - name: Display Warning
         run: |
           echo "⚠️  WARNING: Destroying infrastructure in ${{ matrix.environment }} environment"
+          echo "📁 Terraform directory: ${{ inputs.terraform_directory }}"
           echo "⚠️  This action is IRREVERSIBLE!"
 
       - name: Checkout code
@@ -150,6 +156,7 @@ jobs:
           fi
 
       - name: Terraform Init
+        working-directory: ${{ inputs.terraform_directory }}
         run: |
           terraform init \
             -backend-config="resource_group_name=${{ secrets.BACKEND_RESOURCE_GROUP }}" \
@@ -163,6 +170,7 @@ jobs:
           ARM_TENANT_ID: ${{ secrets.ARM_TENANT_ID }}
 
       - name: Terraform Destroy Plan
+        working-directory: ${{ inputs.terraform_directory }}
         run: |
           echo "📋 Generating destroy plan for ${{ matrix.environment }}..."
           if [ -f "environments/${{ matrix.environment }}.tfvars" ]; then
@@ -172,6 +180,7 @@ jobs:
           fi
 
       - name: Terraform Destroy
+        working-directory: ${{ inputs.terraform_directory }}
         run: |
           echo "🗑️  Executing destruction for ${{ matrix.environment }}..."
           terraform apply -auto-approve tfdestroy

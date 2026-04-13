@@ -28,6 +28,11 @@ on:
         required: false
         type: string
         default: ''
+      terraform_directory:
+        description: 'Directory containing Terraform configuration files'
+        required: false
+        type: string
+        default: '.'
     secrets:
       ARM_CLIENT_ID:
         required: true
@@ -90,6 +95,7 @@ jobs:
       - name: Display Environment Info
         run: |
           echo "📋 Planning for environment: ${{ matrix.environment }}"
+          echo "📁 Terraform directory: ${{ inputs.terraform_directory }}"
           echo "Triggered by: ${{ github.event_name }}"
 
       - name: Checkout code
@@ -147,6 +153,7 @@ jobs:
           fi
 
       - name: Terraform Init
+        working-directory: ${{ inputs.terraform_directory }}
         run: |
           terraform init \
             -backend-config="resource_group_name=${{ secrets.BACKEND_RESOURCE_GROUP }}" \
@@ -161,6 +168,7 @@ jobs:
 
       - name: Terraform Plan
         id: plan
+        working-directory: ${{ inputs.terraform_directory }}
         run: |
           echo "🔍 Generating plan for ${{ matrix.environment }}..."
           if [ -f "environments/${{ matrix.environment }}.tfvars" ]; then
@@ -170,9 +178,11 @@ jobs:
           fi
 
       - name: Convert Plan to JSON
+        working-directory: ${{ inputs.terraform_directory }}
         run: terraform show -json tfplan > tfplan.json
 
       - name: Display Plan Summary
+        working-directory: ${{ inputs.terraform_directory }}
         run: |
           echo "📊 Terraform Plan Summary for ${{ matrix.environment }}:"
           echo "=========================================="
@@ -187,6 +197,16 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: tfplan-${{ matrix.environment }}
+          path: |
+            ${{ inputs.terraform_directory }}/tfplan
+            ${{ inputs.terraform_directory }}/tfplan.json
+          retention-days: 5
+
+      - name: Upload Plan (old path format)
+        if: false
+        uses: actions/upload-artifact@v4
+        with:
+          name: tfplan-${{ matrix.environment }}-old
           path: |
             tfplan
             tfplan.json
@@ -207,6 +227,7 @@ jobs:
       - name: Display Deployment Info
         run: |
           echo "🚀 Deploying to environment: ${{ matrix.environment }}"
+          echo "📁 Terraform directory: ${{ inputs.terraform_directory }}"
 
       - name: Checkout code
         uses: actions/checkout@v3
@@ -263,6 +284,7 @@ jobs:
           fi
 
       - name: Terraform Init
+        working-directory: ${{ inputs.terraform_directory }}
         run: |
           terraform init \
             -backend-config="resource_group_name=${{ secrets.BACKEND_RESOURCE_GROUP }}" \
@@ -279,8 +301,10 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: tfplan-${{ matrix.environment }}
+          path: ${{ inputs.terraform_directory }}
 
       - name: Terraform Apply
+        working-directory: ${{ inputs.terraform_directory }}
         run: |
           echo "⚡ Applying Terraform changes for ${{ matrix.environment }}..."
           terraform apply -auto-approve tfplan

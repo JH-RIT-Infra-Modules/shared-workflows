@@ -23,6 +23,11 @@ on:
         required: false
         type: string
         default: ''
+      terraform_directory:
+        description: 'Directory containing Terraform configuration files'
+        required: false
+        type: string
+        default: '.'
     secrets:
       ARM_CLIENT_ID:
         required: true
@@ -85,6 +90,7 @@ jobs:
       - name: Display Environment Info
         run: |
           echo "🔍 Validating environment: ${{ matrix.environment }}"
+          echo "📁 Terraform directory: ${{ inputs.terraform_directory }}"
 
       - name: Checkout code
         uses: actions/checkout@v3
@@ -136,9 +142,11 @@ jobs:
         uses: terraform-linters/setup-tflint@v3
 
       - name: Initialize TFLint
+        working-directory: ${{ inputs.terraform_directory }}
         run: tflint --init
 
       - name: Run TFLint
+        working-directory: ${{ inputs.terraform_directory }}
         run: |
           echo "🔎 Running TFLint for ${{ matrix.environment }}..."
           tflint -f compact --minimum-failure-severity=error
@@ -160,6 +168,7 @@ jobs:
           echo '${{ inputs.tf_vars }}'
 
       - name: Terraform Init
+        working-directory: ${{ inputs.terraform_directory }}
         run: |
           terraform init \
             -backend-config="resource_group_name=${{ secrets.BACKEND_RESOURCE_GROUP }}" \
@@ -173,11 +182,13 @@ jobs:
           ARM_TENANT_ID: ${{ secrets.ARM_TENANT_ID }}
 
       - name: Terraform Format Check
+        working-directory: ${{ inputs.terraform_directory }}
         run: |
           echo "📝 Checking Terraform formatting..."
           terraform fmt -check -recursive
 
       - name: Terraform Validate
+        working-directory: ${{ inputs.terraform_directory }}
         run: |
           echo "✅ Validating Terraform configuration for ${{ matrix.environment }}..."
           if [ -f "environments/${{ matrix.environment }}.tfvars" ]; then

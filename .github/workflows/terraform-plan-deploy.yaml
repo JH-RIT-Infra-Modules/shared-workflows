@@ -17,12 +17,17 @@ on:
         description: 'Terraform version to use'
         required: false
         type: string
-        default: '1.5.0'
+        default: '1.14.5'
       tf_vars:
         description: 'JSON object of TF_VAR_ environment variables (e.g., {"foo": "bar"})'
         required: false
         type: string
         default: '{}'
+      azure_keyvault_name:
+        description: 'Name of the Azure Key Vault containing secrets (optional)'
+        required: false
+        type: string
+        default: ''
     secrets:
       ARM_CLIENT_ID:
         required: true
@@ -47,6 +52,7 @@ on:
 
 env:
   TF_VERSION: ${{ inputs.terraform_version }}
+  AZURE_KEYVAULT_NAME: ${{ inputs.azure_keyvault_name }}
 
 jobs:
   setup:
@@ -89,6 +95,32 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
 
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          creds: '{"clientId":"${{ secrets.ARM_CLIENT_ID }}","clientSecret":"${{ secrets.ARM_CLIENT_SECRET }}","subscriptionId":"${{ secrets.ARM_SUBSCRIPTION_ID }}","tenantId":"${{ secrets.ARM_TENANT_ID }}"}'
+
+      - name: Fetch Secrets from Azure Key Vault
+        if: inputs.azure_keyvault_name != ''
+        id: keyvault
+        uses: azure/CLI@v1
+        with:
+          inlineScript: |
+            # Fetch all secrets from Key Vault
+            SECRETS=$(az keyvault secret list --vault-name "${{ env.AZURE_KEYVAULT_NAME }}" --query "[].name" -o tsv)
+            
+            for SECRET_NAME in $SECRETS; do
+              # Convert secret name to TF_VAR format (TF_VAR_ prefix uppercase, variable name lowercase, replace hyphens with underscores)
+              VARIABLE_NAME=$(echo "${SECRET_NAME}" | tr '[:upper:]' '[:lower:]' | tr '-' '_')
+              ENV_VAR_NAME="TF_VAR_${VARIABLE_NAME}"
+              SECRET_VALUE=$(az keyvault secret show --vault-name "${{ env.AZURE_KEYVAULT_NAME }}" --name "$SECRET_NAME" --query "value" -o tsv)
+              echo "${ENV_VAR_NAME}=${SECRET_VALUE}" >> $GITHUB_ENV
+              # Mask the secret in logs
+              echo "::add-mask::${SECRET_VALUE}"
+              echo "🔐 Loaded secret: ${ENV_VAR_NAME}"
+            done
+            echo "✅ Secrets loaded from Key Vault: ${{ env.AZURE_KEYVAULT_NAME }}"
+
       - name: Generate GitHub App Token
         id: app-token
         uses: actions/create-github-app-token@v1
@@ -106,15 +138,12 @@ jobs:
         with:
           terraform_version: ${{ env.TF_VERSION }}
 
-      - name: Azure Login
-        uses: azure/login@v2
-        with:
-          creds: '{"clientId":"${{ secrets.ARM_CLIENT_ID }}","clientSecret":"${{ secrets.ARM_CLIENT_SECRET }}","subscriptionId":"${{ secrets.ARM_SUBSCRIPTION_ID }}","tenantId":"${{ secrets.ARM_TENANT_ID }}"}'
-
       - name: Set TF_VAR environment variables
         run: |
+          # Process tf_vars input (only variables prefixed with TF_VAR_)
           if [ '${{ inputs.tf_vars }}' != '{}' ]; then
-            echo '${{ inputs.tf_vars }}' | jq -r 'to_entries[] | "TF_VAR_\(.key)=\(.value)"' >> $GITHUB_ENV
+            # For variables prefixed with TF_VAR_, convert variable name to lowercase while keeping TF_VAR_ prefix uppercase
+            echo '${{ inputs.tf_vars }}' | jq -r 'to_entries[] | select(.key | startswith("TF_VAR_")) | "TF_VAR_" + (.key[7:] | ascii_downcase) + "=" + .value' >> $GITHUB_ENV
           fi
 
       - name: Terraform Init
@@ -182,6 +211,32 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
 
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          creds: '{"clientId":"${{ secrets.ARM_CLIENT_ID }}","clientSecret":"${{ secrets.ARM_CLIENT_SECRET }}","subscriptionId":"${{ secrets.ARM_SUBSCRIPTION_ID }}","tenantId":"${{ secrets.ARM_TENANT_ID }}"}'
+
+      - name: Fetch Secrets from Azure Key Vault
+        if: inputs.azure_keyvault_name != ''
+        id: keyvault
+        uses: azure/CLI@v1
+        with:
+          inlineScript: |
+            # Fetch all secrets from Key Vault
+            SECRETS=$(az keyvault secret list --vault-name "${{ env.AZURE_KEYVAULT_NAME }}" --query "[].name" -o tsv)
+            
+            for SECRET_NAME in $SECRETS; do
+              # Convert secret name to TF_VAR format (TF_VAR_ prefix uppercase, variable name lowercase, replace hyphens with underscores)
+              VARIABLE_NAME=$(echo "${SECRET_NAME}" | tr '[:upper:]' '[:lower:]' | tr '-' '_')
+              ENV_VAR_NAME="TF_VAR_${VARIABLE_NAME}"
+              SECRET_VALUE=$(az keyvault secret show --vault-name "${{ env.AZURE_KEYVAULT_NAME }}" --name "$SECRET_NAME" --query "value" -o tsv)
+              echo "${ENV_VAR_NAME}=${SECRET_VALUE}" >> $GITHUB_ENV
+              # Mask the secret in logs
+              echo "::add-mask::${SECRET_VALUE}"
+              echo "🔐 Loaded secret: ${ENV_VAR_NAME}"
+            done
+            echo "✅ Secrets loaded from Key Vault: ${{ env.AZURE_KEYVAULT_NAME }}"
+
       - name: Generate GitHub App Token
         id: app-token
         uses: actions/create-github-app-token@v1
@@ -199,15 +254,12 @@ jobs:
         with:
           terraform_version: ${{ env.TF_VERSION }}
 
-      - name: Azure Login
-        uses: azure/login@v2
-        with:
-          creds: '{"clientId":"${{ secrets.ARM_CLIENT_ID }}","clientSecret":"${{ secrets.ARM_CLIENT_SECRET }}","subscriptionId":"${{ secrets.ARM_SUBSCRIPTION_ID }}","tenantId":"${{ secrets.ARM_TENANT_ID }}"}'
-
       - name: Set TF_VAR environment variables
         run: |
+          # Process tf_vars input (only variables prefixed with TF_VAR_)
           if [ '${{ inputs.tf_vars }}' != '{}' ]; then
-            echo '${{ inputs.tf_vars }}' | jq -r 'to_entries[] | "TF_VAR_\(.key)=\(.value)"' >> $GITHUB_ENV
+            # For variables prefixed with TF_VAR_, convert variable name to lowercase while keeping TF_VAR_ prefix uppercase
+            echo '${{ inputs.tf_vars }}' | jq -r 'to_entries[] | select(.key | startswith("TF_VAR_")) | "TF_VAR_" + (.key[7:] | ascii_downcase) + "=" + .value' >> $GITHUB_ENV
           fi
 
       - name: Terraform Init

@@ -136,8 +136,10 @@ jobs:
 
       - name: Set TF_VAR environment variables
         run: |
+          # Process tf_vars input (only variables prefixed with TF_VAR_)
           if [ '${{ inputs.tf_vars }}' != '{}' ]; then
-            echo '${{ inputs.tf_vars }}' | jq -r 'to_entries[] | "TF_VAR_\(.key)=\(.value)"' >> $GITHUB_ENV
+            # For variables prefixed with TF_VAR_, convert variable name to lowercase while keeping TF_VAR_ prefix uppercase
+            echo '${{ inputs.tf_vars }}' | jq -r 'to_entries[] | select(.key | startswith("TF_VAR_")) | "TF_VAR_" + (.key[7:] | ascii_downcase) + "=" + .value' >> $GITHUB_ENV
           fi
 
       - name: Terraform Init
@@ -247,8 +249,10 @@ jobs:
 
       - name: Set TF_VAR environment variables
         run: |
+          # Process tf_vars input (only variables prefixed with TF_VAR_)
           if [ '${{ inputs.tf_vars }}' != '{}' ]; then
-            echo '${{ inputs.tf_vars }}' | jq -r 'to_entries[] | "TF_VAR_\(.key)=\(.value)"' >> $GITHUB_ENV
+            # For variables prefixed with TF_VAR_, convert variable name to lowercase while keeping TF_VAR_ prefix uppercase
+            echo '${{ inputs.tf_vars }}' | jq -r 'to_entries[] | select(.key | startswith("TF_VAR_")) | "TF_VAR_" + (.key[7:] | ascii_downcase) + "=" + .value' >> $GITHUB_ENV
           fi
 
       - name: Terraform Init

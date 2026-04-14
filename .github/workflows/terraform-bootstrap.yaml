@@ -1,0 +1,89 @@
+on:
+  workflow_call:
+    inputs:
+      environments:
+        required: true
+        type: string
+        description: "Environments to bootstrap (comma‑separated or JSON array)"
+      location:
+        required: false
+        type: string
+        default: 'eastus'
+      project_name:
+        required: true
+        type: string
+        description: "Name of the project being bootstrapped"
+    secrets:
+      ARM_CLIENT_ID: { required: true }
+      ARM_CLIENT_SECRET: { required: true }
+      ARM_SUBSCRIPTION_ID: { required: true }
+      ARM_TENANT_ID: { required: true }
+      APP_ID: { required: true }
+      APP_PRIVATE_KEY: { required: true }
+
+jobs:
+  bootstrap:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      max-parallel: 4
+      matrix:
+        environment: ${{ inputs.environments }}
+    steps:
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          creds: |
+            {
+              "clientId":"${{ secrets.ARM_CLIENT_ID }}",
+              "clientSecret":"${{ secrets.ARM_CLIENT_SECRET }}",
+              "subscriptionId":"${{ secrets.ARM_SUBSCRIPTION_ID }}",
+              "tenantId":"${{ secrets.ARM_TENANT_ID }}"
+            }
+      - name: Set resource‑group / storage / container names
+        id: naming
+        run: |
+          ENV=${{ matrix.environment }}
+          RG="rg-${{ inputs.project_name }}-${ENV}"
+          SA=$(echo "${{ inputs.project_name }}-st${ENV}acct" | tr -cd '[:alnum:]' | tr '[:upper:]' '[:lower:]')
+          SA=${SA:0:24}
+          CONTAINER="tfstate-${ENV}"
+          echo "resource_group=$RG" >> $GITHUB_OUTPUT
+          echo "storage_account=$SA" >> $GITHUB_OUTPUT
+          echo "container_name=$CONTAINER" >> $GITHUB_OUTPUT
+      - name: Check if Resource Group exists
+        id: rg_check
+        run: |
+          az group exists --name ${{ steps.naming.outputs.resource_group }} \
+            && echo "exists=true" >> $GITHUB_OUTPUT \
+            || echo "exists=false" >> $GITHUB_OUTPUT
+      - name: Create Resource Group
+        if: steps.rg_check.outputs.exists == 'false'
+        run: |
+          az group create \
+            --name ${{ steps.naming.outputs.resource_group }} \
+            --location ${{ inputs.location }}
+      - name: Create Storage Account
+        run: |
+          if ! az storage account check-name --name ${{ steps.naming.outputs.storage_account }} > /dev/null 2>&1; then
+            az storage account create \
+              --name ${{ steps.naming.outputs.storage_account }} \
+              --resource-group ${{ steps.naming.outputs.resource_group }} \
+              --location ${{ inputs.location }} \
+              --sku Standard_LRS \
+              --allow-blob-public-access false
+          fi
+      - name: Create Blob Container
+        run: |
+          STORAGE_KEY=$(az storage account keys list \
+            --name ${{ steps.naming.outputs.storage_account }} \
+            --resource-group ${{ steps.naming.outputs.resource_group }} \
+            --query "[0].value" -o tsv)
+          az storage container create \
+            --name ${{ steps.naming.outputs.container_name }} \
+            --account-name ${{ steps.naming.outputs.storage_account }} \
+            --account-key $STORAGE_KEY \
+            --if-not-exists
+      - name: Output Terraform Backend Config
+        run: |
+            echo "backend_config={\"resource_group\":\"${{ steps.naming.outputs.resource_group }}\",\"storage_account\":\"${{ steps.naming.outputs.storage_account }}\",\"container\":\"${{ steps.naming.outputs.container_name }}\"}" >> $GITHUB_OUTPUT

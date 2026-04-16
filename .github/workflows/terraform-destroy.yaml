@@ -151,12 +151,31 @@ jobs:
         with:
           terraform_version: ${{ env.TF_VERSION }}
           
-      - name: Debug - Output Backend Config Environment Variables
+      - name: Verify Backend Config Secrets
         run: |
-          echo "BACKEND_RESOURCE_GROUP=${{ secrets.BACKEND_RESOURCE_GROUP }}"
-          echo "BACKEND_STORAGE_ACCOUNT=${{ secrets.BACKEND_STORAGE_ACCOUNT }}"
-          echo "BACKEND_CONTAINER_NAME=${{ secrets.BACKEND_CONTAINER_NAME }}"
-          echo "BACKEND_KEY=${{ secrets.BACKEND_KEY }}"
+          # Report existence of required backend secrets.
+          if [ -z "${{ secrets.BACKEND_RESOURCE_GROUP }}" ]; then
+            echo "⚠️ BACKEND_RESOURCE_GROUP does NOT exist"
+          else
+            echo "✅ BACKEND_RESOURCE_GROUP exists"
+          fi
+          if [ -z "${{ secrets.BACKEND_STORAGE_ACCOUNT }}" ]; then
+            echo "⚠️ BACKEND_STORAGE_ACCOUNT does NOT exist"
+          else
+            echo "✅ BACKEND_STORAGE_ACCOUNT exists"
+          fi
+          if [ -z "${{ secrets.BACKEND_CONTAINER_NAME }}" ]; then
+            echo "⚠️ BACKEND_CONTAINER_NAME does NOT exist"
+          else
+            echo "✅ BACKEND_CONTAINER_NAME exists"
+          fi
+          if [ -z "${{ secrets.BACKEND_KEY }}" ]; then
+            echo "⚠️ BACKEND_KEY does NOT exist"
+          else
+            echo "✅ BACKEND_KEY exists"
+          fi
+            exit 1
+          fi
 
       - name: Set TF_VAR environment variables
         run: |

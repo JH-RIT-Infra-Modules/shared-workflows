@@ -71,6 +71,10 @@ jobs:
           echo "You entered: '${{ inputs.confirm_destroy }}'"
           exit 1
 
+      - name: Show envs passed to shared workflow
+        run: |
+          echo "environments sent: ${{ inputs.environments }}"
+
       - name: Parse Environments
         id: parse-envs
         run: |
@@ -94,10 +98,6 @@ jobs:
         environment: ${{ fromJson(needs.setup.outputs.environments) }}
     environment: ${{ matrix.environment }}
     steps:
-      - name: Show envs passed to shared workflow
-        run: |
-          echo "environments sent: ${{ inputs.environments }}"
-
       - name: Display Warning
         run: |
           echo "⚠️  WARNING: Destroying infrastructure in ${{ matrix.environment }} environment"

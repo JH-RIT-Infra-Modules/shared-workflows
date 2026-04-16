@@ -33,27 +33,6 @@ on:
         required: false
         type: string
         default: '.'
-    secrets:
-      ARM_CLIENT_ID:
-        required: true
-      ARM_CLIENT_SECRET:
-        required: true
-      ARM_SUBSCRIPTION_ID:
-        required: true
-      ARM_TENANT_ID:
-        required: true
-      BACKEND_RESOURCE_GROUP:
-        required: true
-      BACKEND_STORAGE_ACCOUNT:
-        required: true
-      BACKEND_CONTAINER_NAME:
-        required: true
-      BACKEND_KEY:
-        required: true
-      APP_ID:
-        required: true
-      APP_PRIVATE_KEY:
-        required: true
 
 env:
   TF_VERSION: ${{ inputs.terraform_version }}

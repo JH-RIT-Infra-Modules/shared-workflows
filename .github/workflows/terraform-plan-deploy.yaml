@@ -167,8 +167,6 @@ jobs:
           else
             echo "✅ BACKEND_KEY exists"
           fi
-            exit 1
-          fi
 
       - name: Set TF_VAR environment variables
         run: |

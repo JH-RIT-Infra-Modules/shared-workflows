@@ -150,6 +150,13 @@ jobs:
         run: |
           echo "🔎 Running TFLint for ${{ matrix.environment }}..."
           tflint -f compact --minimum-failure-severity=error
+          
+      - name: Debug - Output Backend Config Environment Variables
+        run: |
+          echo "BACKEND_RESOURCE_GROUP=${{ secrets.BACKEND_RESOURCE_GROUP }}"
+          echo "BACKEND_STORAGE_ACCOUNT=${{ secrets.BACKEND_STORAGE_ACCOUNT }}"
+          echo "BACKEND_CONTAINER_NAME=${{ secrets.BACKEND_CONTAINER_NAME }}"
+          echo "BACKEND_KEY=${{ secrets.BACKEND_KEY }}"
 
       - name: Set TF_VAR environment variables
         run: |

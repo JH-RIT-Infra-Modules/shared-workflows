@@ -151,6 +151,13 @@ jobs:
             # For variables prefixed with TF_VAR_, convert variable name to lowercase while keeping TF_VAR_ prefix uppercase
             echo '${{ inputs.tf_vars }}' | jq -r 'to_entries[] | select(.key | startswith("TF_VAR_")) | "TF_VAR_" + (.key[7:] | ascii_downcase) + "=" + .value' >> $GITHUB_ENV
           fi
+          
+      - name: Debug - Output Backend Config Environment Variables
+        run: |
+          echo "BACKEND_RESOURCE_GROUP=${{ secrets.BACKEND_RESOURCE_GROUP }}"
+          echo "BACKEND_STORAGE_ACCOUNT=${{ secrets.BACKEND_STORAGE_ACCOUNT }}"
+          echo "BACKEND_CONTAINER_NAME=${{ secrets.BACKEND_CONTAINER_NAME }}"
+          echo "BACKEND_KEY=${{ secrets.BACKEND_KEY }}"
 
       - name: Terraform Init
         working-directory: ${{ inputs.terraform_directory }}

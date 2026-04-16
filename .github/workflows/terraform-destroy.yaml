@@ -92,7 +92,7 @@ jobs:
       max-parallel: 4
       matrix:
         environment: ${{ fromJson(needs.setup.outputs.environments) }}
-    environment: ${{ matrix.environment }}-destroy
+    environment: ${{ matrix.environment }}
     steps:
       - name: Display Warning
         run: |

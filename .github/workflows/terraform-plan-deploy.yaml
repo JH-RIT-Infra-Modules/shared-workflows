@@ -33,6 +33,22 @@ on:
         required: false
         type: string
         default: '.'
+      backend_resource_group:
+        description: 'Azure Resource Group for Terraform backend (optional, can also be set as secret)'
+        required: true
+        type: string
+      backend_storage_account:
+        description: 'Azure Storage Account for Terraform backend (optional, can also be set as secret)'
+        required: true
+        type: string
+      backend_container_name:
+        description: 'Azure Storage Container for Terraform backend (optional, can also be set as secret)'
+        required: true
+        type: string
+      backend_key:
+        description: 'Azure Storage Key for Terraform backend (optional, can also be set as secret)'
+        required: true 
+        type: string
     secrets:
       ARM_CLIENT_ID:
         required: true
@@ -41,14 +57,6 @@ on:
       ARM_SUBSCRIPTION_ID:
         required: true
       ARM_TENANT_ID:
-        required: true
-      BACKEND_RESOURCE_GROUP:
-        required: true
-      BACKEND_STORAGE_ACCOUNT:
-        required: true
-      BACKEND_CONTAINER_NAME:
-        required: true
-      BACKEND_KEY:
         required: true
       APP_ID:
         required: true

@@ -3,11 +3,10 @@ name: Terraform Build & Deploy
 on:
   workflow_call:
     inputs:
-      environments:
-        description: 'Environments to deploy (comma-separated: dev,test,stage,prod or "all")'
+      target_env:
+        description: 'Target environment for this workflow (e.g., dev, test, stage, prod)'
         required: false
         type: string
-        default: 'dev'
       run_deploy:
         description: 'Should the TF Apply Job Run?'
         required: false
@@ -33,22 +32,22 @@ on:
         required: false
         type: string
         default: '.'
-      backend_resource_group:
-        description: 'Azure Resource Group for Terraform backend (optional, can also be set as secret)'
-        required: true
-        type: string
-      backend_storage_account:
-        description: 'Azure Storage Account for Terraform backend (optional, can also be set as secret)'
-        required: true
-        type: string
-      backend_container_name:
-        description: 'Azure Storage Container for Terraform backend (optional, can also be set as secret)'
-        required: true
-        type: string
-      backend_key:
-        description: 'Azure Storage Key for Terraform backend (optional, can also be set as secret)'
-        required: true 
-        type: string
+      # backend_resource_group:
+      #   description: 'Azure Resource Group for Terraform backend (optional, can also be set as secret)'
+      #   required: true
+      #   type: string
+      # backend_storage_account:
+      #   description: 'Azure Storage Account for Terraform backend (optional, can also be set as secret)'
+      #   required: true
+      #   type: string
+      # backend_container_name:
+      #   description: 'Azure Storage Container for Terraform backend (optional, can also be set as secret)'
+      #   required: true
+      #   type: string
+      # backend_key:
+      #   description: 'Azure Storage Key for Terraform backend (optional, can also be set as secret)'
+      #   required: true 
+      #   type: string
     secrets:
       ARM_CLIENT_ID:
         required: true
@@ -65,44 +64,22 @@ on:
 
 env:
   TF_VERSION: ${{ inputs.terraform_version }}
-  AZURE_KEYVAULT_NAME: ${{ inputs.azure_keyvault_name }}
+  # AZURE_KEYVAULT_NAME: ${{ inputs.azure_keyvault_name }}
 
 jobs:
-  setup:
-    name: Setup
-    runs-on: ubuntu-latest
-    outputs:
-      environments: ${{ steps.parse-envs.outputs.environments }}
-    steps:
-      - name: Parse Environments
-        id: parse-envs
-        run: |
-          INPUT="${{ inputs.environments }}"
-          if [ -z "$INPUT" ]; then INPUT="dev"; fi
-          if [ "$INPUT" == "all" ]; then
-            ENVS='["dev","test","stage","prod"]'
-          else
-            ENVS=$(echo "$INPUT" | tr ',' '\n' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//' | sed 's/^/"/;s/$/"/' | tr '\n' ',' | sed 's/,$//' | sed 's/^/[/;s/$/]/')
-          fi
-          echo "environments=$ENVS" >> $GITHUB_OUTPUT
-          echo "🎯 Environments to process: $ENVS"
-
   plan:
-    name: Plan (${{ matrix.environment }})
+    name: Plan (${{ inputs.target_env }})
     runs-on: ubuntu-latest
-    needs: setup
     strategy:
       fail-fast: false
       max-parallel: 4
-      matrix:
-        environment: ${{ fromJson(needs.setup.outputs.environments) }}
-    environment: ${{ matrix.environment }}
+    environment: $
     outputs:
       plan-status: ${{ steps.plan.outcome }}
     steps:
       - name: Display Environment Info
         run: |
-          echo "📋 Planning for environment: ${{ matrix.environment }}"
+          echo "📋 Planning for environment: ${{ inputs.target_env }}"
           echo "📁 Terraform directory: ${{ inputs.terraform_directory }}"
           echo "Triggered by: ${{ github.event_name }}"
 
@@ -155,22 +132,22 @@ jobs:
       - name: Verify Backend Config Secrets
         run: |
           # Report existence of required backend secrets.
-          if [ -z "${{ inputs.backend_resource_group }}" ]; then
+          if [ -z "${{ vars.BACKEND_RESOURCE_GROUP }}" ]; then
             echo "⚠️ BACKEND_RESOURCE_GROUP does NOT exist"
           else
             echo "✅ BACKEND_RESOURCE_GROUP exists"
           fi
-          if [ -z "${{ inputs.backend_storage_account }}" ]; then
+          if [ -z "${{ vars.BACKEND_STORAGE_ACCOUNT }}" ]; then
             echo "⚠️ BACKEND_STORAGE_ACCOUNT does NOT exist"
           else
             echo "✅ BACKEND_STORAGE_ACCOUNT exists"
           fi
-          if [ -z "${{ inputs.backend_container_name }}" ]; then
+          if [ -z "${{ vars.BACKEND_CONTAINER_NAME }}" ]; then
             echo "⚠️ BACKEND_CONTAINER_NAME does NOT exist"
           else
             echo "✅ BACKEND_CONTAINER_NAME exists"
           fi
-          if [ -z "${{ inputs.backend_key }}" ]; then
+          if [ -z "${{ vars.BACKEND_KEY }}" ]; then
             echo "⚠️ BACKEND_KEY does NOT exist"
           else
             echo "✅ BACKEND_KEY exists"
@@ -188,10 +165,10 @@ jobs:
         working-directory: ${{ inputs.terraform_directory }}
         run: |
           terraform init \
-            -backend-config="resource_group_name=${{ inputs.BACKEND_RESOURCE_GROUP }}" \
-            -backend-config="storage_account_name=${{ inputs.BACKEND_STORAGE_ACCOUNT }}" \
-            -backend-config="container_name=${{ inputs.BACKEND_CONTAINER_NAME }}" \
-            -backend-config="key=${{ inputs.BACKEND_KEY }}"
+            -backend-config="resource_group_name=${{ vars.BACKEND_RESOURCE_GROUP }}" \
+            -backend-config="storage_account_name=${{ vars.BACKEND_STORAGE_ACCOUNT }}" \
+            -backend-config="container_name=${{ vars.BACKEND_CONTAINER_NAME }}" \
+            -backend-config="key=${{ vars.BACKEND_KEY }}"
         env:
           ARM_CLIENT_ID: ${{ secrets.ARM_CLIENT_ID }}
           ARM_CLIENT_SECRET: ${{ secrets.ARM_CLIENT_SECRET }}
@@ -202,9 +179,9 @@ jobs:
         id: plan
         working-directory: ${{ inputs.terraform_directory }}
         run: |
-          echo "🔍 Generating plan for ${{ matrix.environment }}..."
-          if [ -f "environments/${{ matrix.environment }}.tfvars" ]; then
-            terraform plan -var-file="environments/${{ matrix.environment }}.tfvars" -out=tfplan
+          echo "🔍 Generating plan for ${{ inputs.target_env }}..."
+          if [ -f "environments/${{ inputs.target_env }}.tfvars" ]; then
+            terraform plan -var-file="environments/${{ inputs.target_env }}.tfvars" -out=tfplan
           else
             terraform plan -out=tfplan
           fi
@@ -216,7 +193,7 @@ jobs:
       - name: Display Plan Summary
         working-directory: ${{ inputs.terraform_directory }}
         run: |
-          echo "📊 Terraform Plan Summary for ${{ matrix.environment }}:"
+          echo "📊 Terraform Plan Summary for ${{ inputs.target_env }}:"
           echo "=========================================="
           if jq -e '.resource_changes' tfplan.json > /dev/null 2>&1; then
             cat tfplan.json | jq -r '.resource_changes[] | "\(.change.actions | join(",")) \(.type).\(.name)"' || echo "No changes detected"
@@ -228,7 +205,7 @@ jobs:
       - name: Upload Plan
         uses: actions/upload-artifact@v4
         with:
-          name: tfplan-${{ matrix.environment }}
+          name: tfplan-${{ inputs.target_env }}
           path: |
             ${{ inputs.terraform_directory }}/tfplan
             ${{ inputs.terraform_directory }}/tfplan.json
@@ -238,27 +215,25 @@ jobs:
         if: false
         uses: actions/upload-artifact@v4
         with:
-          name: tfplan-${{ matrix.environment }}-old
+          name: tfplan-${{ inputs.target_env }}-old
           path: |
             tfplan
             tfplan.json
           retention-days: 5
 
   apply:
-    name: Deploy (${{ matrix.environment }})
+    name: Deploy (${{ inputs.target_env }})
     runs-on: ubuntu-latest
-    needs: [setup, plan]
+    needs: [plan]
     if: ${{ inputs.run_deploy == true }}
     strategy:
       fail-fast: false
       max-parallel: 4
-      matrix:
-        environment: ${{ fromJson(needs.setup.outputs.environments) }}
-    environment: ${{ matrix.environment }}
+    environment: ${{ inputs.target_env }}
     steps:
       - name: Display Deployment Info
         run: |
-          echo "🚀 Deploying to environment: ${{ matrix.environment }}"
+          echo "🚀 Deploying to environment: ${{ inputs.target_env }}"
           echo "📁 Terraform directory: ${{ inputs.terraform_directory }}"
 
       - name: Checkout code
@@ -276,19 +251,19 @@ jobs:
         with:
           inlineScript: |
             # Fetch all secrets from Key Vault
-            SECRETS=$(az keyvault secret list --vault-name "${{ env.AZURE_KEYVAULT_NAME }}" --query "[].name" -o tsv)
+            SECRETS=$(az keyvault secret list --vault-name "${{ vars.AZURE_KEYVAULT_NAME }}" --query "[].name" -o tsv)
             
             for SECRET_NAME in $SECRETS; do
               # Convert secret name to TF_VAR format (TF_VAR_ prefix uppercase, variable name lowercase, replace hyphens with underscores)
               VARIABLE_NAME=$(echo "${SECRET_NAME}" | tr '[:upper:]' '[:lower:]' | tr '-' '_')
               ENV_VAR_NAME="TF_VAR_${VARIABLE_NAME}"
-              SECRET_VALUE=$(az keyvault secret show --vault-name "${{ env.AZURE_KEYVAULT_NAME }}" --name "$SECRET_NAME" --query "value" -o tsv)
+              SECRET_VALUE=$(az keyvault secret show --vault-name "${{ vars.AZURE_KEYVAULT_NAME }}" --name "$SECRET_NAME" --query "value" -o tsv)
               echo "${ENV_VAR_NAME}=${SECRET_VALUE}" >> $GITHUB_ENV
               # Mask the secret in logs
               echo "::add-mask::${SECRET_VALUE}"
               echo "🔐 Loaded secret: ${ENV_VAR_NAME}"
             done
-            echo "✅ Secrets loaded from Key Vault: ${{ env.AZURE_KEYVAULT_NAME }}"
+            echo "✅ Secrets loaded from Key Vault: ${{ vars.AZURE_KEYVAULT_NAME }}"
 
       - name: Generate GitHub App Token
         id: app-token
@@ -332,12 +307,12 @@ jobs:
       - name: Download Plan
         uses: actions/download-artifact@v4
         with:
-          name: tfplan-${{ matrix.environment }}
+          name: tfplan-${{ inputs.target_env }}
           path: ${{ inputs.terraform_directory }}
 
       - name: Terraform Apply
         working-directory: ${{ inputs.terraform_directory }}
         run: |
-          echo "⚡ Applying Terraform changes for ${{ matrix.environment }}..."
+          echo "⚡ Applying Terraform changes for ${{ inputs.target_env }}..."
           terraform apply -auto-approve tfplan
-          echo "✅ Deployment complete for ${{ matrix.environment }}"
+          echo "✅ Deployment complete for ${{ inputs.target_env }}"

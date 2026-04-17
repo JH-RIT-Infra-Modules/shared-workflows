@@ -3,9 +3,9 @@ name: Terraform Destroy
 on:
   workflow_call:
     inputs:
-      environments:
-        description: 'Environments to destroy (comma-separated: dev,test,stage,prod or "all")'
-        required: true
+      target_env:
+        description: 'Target environment for this workflow (e.g., dev, test, stage, prod)'
+        required: false
         type: string
       confirm_destroy:
         description: 'Type "DESTROY" to confirm destruction'
@@ -31,86 +31,54 @@ on:
         required: false
         type: string
         default: '.'
-      backend_resource_group:
-        description: 'Azure Resource Group for Terraform backend (optional, can also be set as secret)'
-        required: true
-        type: string
-      backend_storage_account:
-        description: 'Azure Storage Account for Terraform backend (optional, can also be set as secret)'
-        required: true
-        type: string
-      backend_container_name:
-        description: 'Azure Storage Container for Terraform backend (optional, can also be set as secret)'
-        required: false
-        type: string
-        default: 'tfstate'
-      backend_key:
-        description: 'Azure Storage Key for Terraform backend (optional, can also be set as secret)'
-        required: true 
-        type: string
-    secrets:
-      ARM_CLIENT_ID:
-        required: true
-      ARM_CLIENT_SECRET:
-        required: true
-      ARM_SUBSCRIPTION_ID:
-        required: true
-      ARM_TENANT_ID:
-        required: true
-      APP_ID:
-        required: true
-      APP_PRIVATE_KEY:
-        required: true
+      # backend_resource_group:
+      #   description: 'Azure Resource Group for Terraform backend (optional, can also be set as secret)'
+      #   required: true
+      #   type: string
+      # backend_storage_account:
+      #   description: 'Azure Storage Account for Terraform backend (optional, can also be set as secret)'
+      #   required: true
+      #   type: string
+      # backend_container_name:
+      #   description: 'Azure Storage Container for Terraform backend (optional, can also be set as secret)'
+      #   required: false
+      #   type: string
+      #   default: 'tfstate'
+      # backend_key:
+      #   description: 'Azure Storage Key for Terraform backend (optional, can also be set as secret)'
+      #   required: true 
+      #   type: string
+    # secrets:
+    #   ARM_CLIENT_ID:
+    #     required: true
+    #   ARM_CLIENT_SECRET:
+    #     required: true
+    #   ARM_SUBSCRIPTION_ID:
+    #     required: true
+    #   ARM_TENANT_ID:
+    #     required: true
+    #   APP_ID:
+    #     required: true
+    #   APP_PRIVATE_KEY:
+    #     required: true
 
 env:
   TF_VERSION: ${{ inputs.terraform_version }}
   AZURE_KEYVAULT_NAME: ${{ inputs.azure_keyvault_name }}
 
 jobs:
-  setup:
-    name: Setup & Validate
-    runs-on: ubuntu-latest
-    outputs:
-      environments: ${{ steps.parse-envs.outputs.environments }}
-    steps:
-      - name: Validate Confirmation
-        if: inputs.confirm_destroy != 'DESTROY'
-        run: |
-          echo "❌ ERROR: You must type 'DESTROY' to confirm destruction."
-          echo "You entered: '${{ inputs.confirm_destroy }}'"
-          exit 1
-
-      - name: Show envs passed to shared workflow
-        run: |
-          echo "environments sent: ${{ inputs.environments }}"
-
-      - name: Parse Environments
-        id: parse-envs
-        run: |
-          INPUT="${{ inputs.environments }}"
-          if [ -z "$INPUT" ]; then INPUT="dev"; fi
-          if [ "$INPUT" == "all" ]; then
-            ENVS='["dev","test","stage","prod"]'
-          else
-            ENVS=$(echo "$INPUT" | tr ',' '\n' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//' | sed 's/^/"/;s/$/"/' | tr '\n' ',' | sed 's/,$//' | sed 's/^/[/;s/$/]/')
-          fi
-          echo "environments=$ENVS" >> $GITHUB_OUTPUT
-          echo "🎯 Environments to destroy: $ENVS"
 
   destroy:
-    name: Destroy (${{ matrix.environment }})
+    name: Destroy (${{ inputs.target_env }})
     runs-on: ubuntu-latest
-    needs: setup
     strategy:
       fail-fast: false
       max-parallel: 4
-      matrix:
-        environment: ${{ fromJson(needs.setup.outputs.environments) }}
-    environment: ${{ matrix.environment }}
+    environment: ${{ inputs.target_env }}
     steps:
       - name: Display Warning
         run: |
-          echo "⚠️  WARNING: Destroying infrastructure in ${{ matrix.environment }} environment"
+          echo "⚠️  WARNING: Destroying infrastructure in ${{ inputs.target_env }} environment"
           echo "📁 Terraform directory: ${{ inputs.terraform_directory }}"
           echo "⚠️  This action is IRREVERSIBLE!"
 
@@ -163,22 +131,22 @@ jobs:
       - name: Verify Backend Config Secrets
         run: |
           # Report existence of required backend secrets.
-          if [ -z "${{ inputs.backend_resource_group }}" ]; then
+          if [ -z "${{ vars.BACKEND_RESOURCE_GROUP }}" ]; then
             echo "⚠️ BACKEND_RESOURCE_GROUP does NOT exist"
           else
             echo "✅ BACKEND_RESOURCE_GROUP exists"
           fi
-          if [ -z "${{ inputs.backend_storage_account }}" ]; then
+          if [ -z "${{ vars.BACKEND_STORAGE_ACCOUNT }}" ]; then
             echo "⚠️ BACKEND_STORAGE_ACCOUNT does NOT exist"
           else
             echo "✅ BACKEND_STORAGE_ACCOUNT exists"
           fi
-          if [ -z "${{ inputs.backend_container_name }}" ]; then
+          if [ -z "${{ vars.BACKEND_CONTAINER_NAME }}" ]; then
             echo "⚠️ BACKEND_CONTAINER_NAME does NOT exist"
           else
             echo "✅ BACKEND_CONTAINER_NAME exists"
           fi
-          if [ -z "${{ inputs.backend_key }}" ]; then
+          if [ -z "${{ vars.BACKEND_KEY }}" ]; then
             echo "⚠️ BACKEND_KEY does NOT exist"
           else
             echo "✅ BACKEND_KEY exists"
@@ -196,10 +164,10 @@ jobs:
         working-directory: ${{ inputs.terraform_directory }}
         run: |
           terraform init \
-            -backend-config="resource_group_name=${{ inputs.BACKEND_RESOURCE_GROUP }}" \
-            -backend-config="storage_account_name=${{ inputs.BACKEND_STORAGE_ACCOUNT }}" \
-            -backend-config="container_name=${{ inputs.BACKEND_CONTAINER_NAME }}" \
-            -backend-config="key=${{ inputs.BACKEND_KEY }}"
+            -backend-config="resource_group_name=${{ vars.BACKEND_RESOURCE_GROUP }}" \
+            -backend-config="storage_account_name=${{ vars.BACKEND_STORAGE_ACCOUNT }}" \
+            -backend-config="container_name=${{ vars.BACKEND_CONTAINER_NAME }}" \
+            -backend-config="key=${{ vars.BACKEND_KEY }}"
         env:
           ARM_CLIENT_ID: ${{ secrets.ARM_CLIENT_ID }}
           ARM_CLIENT_SECRET: ${{ secrets.ARM_CLIENT_SECRET }}
@@ -209,9 +177,9 @@ jobs:
       - name: Terraform Destroy Plan
         working-directory: ${{ inputs.terraform_directory }}
         run: |
-          echo "📋 Generating destroy plan for ${{ matrix.environment }}..."
-          if [ -f "environments/${{ matrix.environment }}.tfvars" ]; then
-            terraform plan -destroy -var-file="environments/${{ matrix.environment }}.tfvars" -out=tfdestroy
+          echo "📋 Generating destroy plan for ${{ inputs.target_env }}..."
+          if [ -f "environments/${{ inputs.target_env }}.tfvars" ]; then
+            terraform plan -destroy -var-file="environments/${{ inputs.target_env }}.tfvars" -out=tfdestroy
           else
             terraform plan -destroy -out=tfdestroy
           fi
@@ -219,6 +187,6 @@ jobs:
       - name: Terraform Destroy
         working-directory: ${{ inputs.terraform_directory }}
         run: |
-          echo "🗑️  Executing destruction for ${{ matrix.environment }}..."
+          echo "🗑️  Executing destruction for ${{ inputs.target_env }}..."
           terraform apply -auto-approve tfdestroy
-          echo "✅ Destruction complete for ${{ matrix.environment }}"
+          echo "✅ Destruction complete for ${{ inputs.target_env }}"

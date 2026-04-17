@@ -31,6 +31,23 @@ on:
         required: false
         type: string
         default: '.'
+      backend_resource_group:
+        description: 'Azure Resource Group for Terraform backend (optional, can also be set as secret)'
+        required: true
+        type: string
+      backend_storage_account:
+        description: 'Azure Storage Account for Terraform backend (optional, can also be set as secret)'
+        required: true
+        type: string
+      backend_container_name:
+        description: 'Azure Storage Container for Terraform backend (optional, can also be set as secret)'
+        required: false
+        type: string
+        default: 'tfstate'
+      backend_key:
+        description: 'Azure Storage Key for Terraform backend (optional, can also be set as secret)'
+        required: true 
+        type: string
     secrets:
       ARM_CLIENT_ID:
         required: true
@@ -39,14 +56,6 @@ on:
       ARM_SUBSCRIPTION_ID:
         required: true
       ARM_TENANT_ID:
-        required: true
-      BACKEND_RESOURCE_GROUP:
-        required: true
-      BACKEND_STORAGE_ACCOUNT:
-        required: true
-      BACKEND_CONTAINER_NAME:
-        required: true
-      BACKEND_KEY:
         required: true
       APP_ID:
         required: true
@@ -71,14 +80,19 @@ jobs:
           echo "You entered: '${{ inputs.confirm_destroy }}'"
           exit 1
 
+      - name: Show envs passed to shared workflow
+        run: |
+          echo "environments sent: ${{ inputs.environments }}"
+
       - name: Parse Environments
         id: parse-envs
         run: |
           INPUT="${{ inputs.environments }}"
+          if [ -z "$INPUT" ]; then INPUT="dev"; fi
           if [ "$INPUT" == "all" ]; then
             ENVS='["dev","test","stage","prod"]'
           else
-            ENVS=$(echo "$INPUT" | tr ',' '\n' | sed 's/^"/;s/$/"/' | tr '\n' ',' | sed 's/,$//' | sed 's/^/[/;s/$/]/')
+            ENVS=$(echo "$INPUT" | tr ',' '\n' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//' | sed 's/^/"/;s/$/"/' | tr '\n' ',' | sed 's/,$//' | sed 's/^/[/;s/$/]/')
           fi
           echo "environments=$ENVS" >> $GITHUB_OUTPUT
           echo "🎯 Environments to destroy: $ENVS"
@@ -92,7 +106,7 @@ jobs:
       max-parallel: 4
       matrix:
         environment: ${{ fromJson(needs.setup.outputs.environments) }}
-    environment: ${{ matrix.environment }}-destroy
+    environment: ${{ matrix.environment }}
     steps:
       - name: Display Warning
         run: |
@@ -106,7 +120,6 @@ jobs:
       - name: Azure Login
         uses: azure/login@v2
         with:
-
           creds: '{"clientId":"${{ secrets.ARM_CLIENT_ID }}","clientSecret":"${{ secrets.ARM_CLIENT_SECRET }}","subscriptionId":"${{ secrets.ARM_SUBSCRIPTION_ID }}","tenantId":"${{ secrets.ARM_TENANT_ID }}"}'
 
       - name: Fetch Secrets from Azure Key Vault
@@ -146,6 +159,30 @@ jobs:
         uses: hashicorp/setup-terraform@v2
         with:
           terraform_version: ${{ env.TF_VERSION }}
+          
+      - name: Verify Backend Config Secrets
+        run: |
+          # Report existence of required backend secrets.
+          if [ -z "${{ inputs.backend_resource_group }}" ]; then
+            echo "⚠️ BACKEND_RESOURCE_GROUP does NOT exist"
+          else
+            echo "✅ BACKEND_RESOURCE_GROUP exists"
+          fi
+          if [ -z "${{ inputs.backend_storage_account }}" ]; then
+            echo "⚠️ BACKEND_STORAGE_ACCOUNT does NOT exist"
+          else
+            echo "✅ BACKEND_STORAGE_ACCOUNT exists"
+          fi
+          if [ -z "${{ inputs.backend_container_name }}" ]; then
+            echo "⚠️ BACKEND_CONTAINER_NAME does NOT exist"
+          else
+            echo "✅ BACKEND_CONTAINER_NAME exists"
+          fi
+          if [ -z "${{ inputs.backend_key }}" ]; then
+            echo "⚠️ BACKEND_KEY does NOT exist"
+          else
+            echo "✅ BACKEND_KEY exists"
+          fi
 
       - name: Set TF_VAR environment variables
         run: |
@@ -159,10 +196,10 @@ jobs:
         working-directory: ${{ inputs.terraform_directory }}
         run: |
           terraform init \
-            -backend-config="resource_group_name=${{ secrets.BACKEND_RESOURCE_GROUP }}" \
-            -backend-config="storage_account_name=${{ secrets.BACKEND_STORAGE_ACCOUNT }}" \
-            -backend-config="container_name=${{ secrets.BACKEND_CONTAINER_NAME }}" \
-            -backend-config="key=${{ secrets.BACKEND_KEY }}"
+            -backend-config="resource_group_name=${{ inputs.BACKEND_RESOURCE_GROUP }}" \
+            -backend-config="storage_account_name=${{ inputs.BACKEND_STORAGE_ACCOUNT }}" \
+            -backend-config="container_name=${{ inputs.BACKEND_CONTAINER_NAME }}" \
+            -backend-config="key=${{ inputs.BACKEND_KEY }}"
         env:
           ARM_CLIENT_ID: ${{ secrets.ARM_CLIENT_ID }}
           ARM_CLIENT_SECRET: ${{ secrets.ARM_CLIENT_SECRET }}

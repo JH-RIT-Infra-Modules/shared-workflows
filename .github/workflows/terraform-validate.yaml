@@ -28,6 +28,22 @@ on:
         required: false
         type: string
         default: '.'
+      backend_resource_group:
+        description: 'Azure Resource Group for Terraform backend (optional, can also be set as secret)'
+        required: true
+        type: string
+      backend_storage_account:
+        description: 'Azure Storage Account for Terraform backend (optional, can also be set as secret)'
+        required: true
+        type: string
+      backend_container_name:
+        description: 'Azure Storage Container for Terraform backend (optional, can also be set as secret)'
+        required: true
+        type: string
+      backend_key:
+        description: 'Azure Storage Key for Terraform backend (optional, can also be set as secret)'
+        required: true 
+        type: string
     secrets:
       ARM_CLIENT_ID:
         required: true
@@ -36,14 +52,6 @@ on:
       ARM_SUBSCRIPTION_ID:
         required: true
       ARM_TENANT_ID:
-        required: true
-      BACKEND_RESOURCE_GROUP:
-        required: true
-      BACKEND_STORAGE_ACCOUNT:
-        required: true
-      BACKEND_CONTAINER_NAME:
-        required: true
-      BACKEND_KEY:
         required: true
       APP_ID:
         required: true
@@ -150,6 +158,30 @@ jobs:
         run: |
           echo "🔎 Running TFLint for ${{ matrix.environment }}..."
           tflint -f compact --minimum-failure-severity=error
+          
+      - name: Verify Backend Config Secrets
+        run: |
+          # Report existence of required backend secrets.
+          if [ -z "${{ inputs.backend_resource_group }}" ]; then
+            echo "⚠️ BACKEND_RESOURCE_GROUP does NOT exist"
+          else
+            echo "✅ BACKEND_RESOURCE_GROUP exists"
+          fi
+          if [ -z "${{ inputs.backend_storage_account }}" ]; then
+            echo "⚠️ BACKEND_STORAGE_ACCOUNT does NOT exist"
+          else
+            echo "✅ BACKEND_STORAGE_ACCOUNT exists"
+          fi
+          if [ -z "${{ inputs.backend_container_name }}" ]; then
+            echo "⚠️ BACKEND_CONTAINER_NAME does NOT exist"
+          else
+            echo "✅ BACKEND_CONTAINER_NAME exists"
+          fi
+          if [ -z "${{ inputs.backend_key }}" ]; then
+            echo "⚠️ BACKEND_KEY does NOT exist"
+          else
+            echo "✅ BACKEND_KEY exists"
+          fi
 
       - name: Set TF_VAR environment variables
         run: |
@@ -171,10 +203,10 @@ jobs:
         working-directory: ${{ inputs.terraform_directory }}
         run: |
           terraform init \
-            -backend-config="resource_group_name=${{ secrets.BACKEND_RESOURCE_GROUP }}" \
-            -backend-config="storage_account_name=${{ secrets.BACKEND_STORAGE_ACCOUNT }}" \
-            -backend-config="container_name=${{ secrets.BACKEND_CONTAINER_NAME }}" \
-            -backend-config="key=${{ secrets.BACKEND_KEY }}"
+            -backend-config="resource_group_name=${{ inputs.BACKEND_RESOURCE_GROUP }}" \
+            -backend-config="storage_account_name=${{ inputs.BACKEND_STORAGE_ACCOUNT }}" \
+            -backend-config="container_name=${{ inputs.BACKEND_CONTAINER_NAME }}" \
+            -backend-config="key=${{ inputs.BACKEND_KEY }}"
         env:
           ARM_CLIENT_ID: ${{ secrets.ARM_CLIENT_ID }}
           ARM_CLIENT_SECRET: ${{ secrets.ARM_CLIENT_SECRET }}

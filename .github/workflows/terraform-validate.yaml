@@ -3,11 +3,10 @@ name: Terraform Validate
 on:
   workflow_call:
     inputs:
-      environments:
-        description: 'Environments to validate (comma-separated: dev,test,stage,prod or "all")'
+      target_env:
+        description: 'Target environment for this workflow (e.g., dev, test, stage, prod)'
         required: false
         type: string
-        default: 'all'
       terraform_version:
         description: 'Terraform version to use'
         required: false
@@ -28,71 +27,17 @@ on:
         required: false
         type: string
         default: '.'
-      backend_resource_group:
-        description: 'Azure Resource Group for Terraform backend (optional, can also be set as secret)'
-        required: true
-        type: string
-      backend_storage_account:
-        description: 'Azure Storage Account for Terraform backend (optional, can also be set as secret)'
-        required: true
-        type: string
-      backend_container_name:
-        description: 'Azure Storage Container for Terraform backend (optional, can also be set as secret)'
-        required: true
-        type: string
-      backend_key:
-        description: 'Azure Storage Key for Terraform backend (optional, can also be set as secret)'
-        required: true 
-        type: string
-    secrets:
-      ARM_CLIENT_ID:
-        required: true
-      ARM_CLIENT_SECRET:
-        required: true
-      ARM_SUBSCRIPTION_ID:
-        required: true
-      ARM_TENANT_ID:
-        required: true
-      APP_ID:
-        required: true
-      APP_PRIVATE_KEY:
-        required: true
 
 env:
   TF_VERSION: ${{ inputs.terraform_version }}
   AZURE_KEYVAULT_NAME: ${{ inputs.azure_keyvault_name }}
 
 jobs:
-  # Parse the environments input
-  setup:
-    name: Setup
-    runs-on: ubuntu-latest
-    outputs:
-      environments: ${{ steps.parse-envs.outputs.environments }}
-    steps:
-      - name: Parse Environments
-        id: parse-envs
-        run: |
-          INPUT="${{ inputs.environments }}"
-          if [ -z "$INPUT" ]; then INPUT="all"; fi
-          if [ "$INPUT" == "all" ]; then
-            ENVS='["dev","test","stage","prod"]'
-          else
-            # Convert comma-separated to JSON array
-            ENVS=$(echo "$INPUT" | tr ',' '\n' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//' | sed 's/^/"/;s/$/"/' | tr '\n' ',' | sed 's/,$//' | sed 's/^/[/;s/$/]/')
-          fi
-          echo "environments=$ENVS" >> $GITHUB_OUTPUT
-          echo "🎯 Environments to validate: $ENVS"
-
   validate:
     name: Validate (${{ matrix.environment }})
     runs-on: ubuntu-latest
-    needs: setup
     strategy:
       fail-fast: false
-      max-parallel: 4
-      matrix:
-        environment: ${{ fromJson(needs.setup.outputs.environments) }}
     environment: ${{ matrix.environment }}
     steps:
       - name: Display Environment Info
@@ -162,22 +107,22 @@ jobs:
       - name: Verify Backend Config Secrets
         run: |
           # Report existence of required backend secrets.
-          if [ -z "${{ inputs.backend_resource_group }}" ]; then
+          if [ -z "${{ vars.BACKEND_RESOURCE_GROUP }}" ]; then
             echo "⚠️ BACKEND_RESOURCE_GROUP does NOT exist"
           else
             echo "✅ BACKEND_RESOURCE_GROUP exists"
           fi
-          if [ -z "${{ inputs.backend_storage_account }}" ]; then
+          if [ -z "${{ vars.BACKEND_STORAGE_ACCOUNT }}" ]; then
             echo "⚠️ BACKEND_STORAGE_ACCOUNT does NOT exist"
           else
             echo "✅ BACKEND_STORAGE_ACCOUNT exists"
           fi
-          if [ -z "${{ inputs.backend_container_name }}" ]; then
+          if [ -z "${{ vars.BACKEND_CONTAINER_NAME }}" ]; then
             echo "⚠️ BACKEND_CONTAINER_NAME does NOT exist"
           else
             echo "✅ BACKEND_CONTAINER_NAME exists"
           fi
-          if [ -z "${{ inputs.backend_key }}" ]; then
+          if [ -z "${{ vars.BACKEND_KEY }}" ]; then
             echo "⚠️ BACKEND_KEY does NOT exist"
           else
             echo "✅ BACKEND_KEY exists"
@@ -203,10 +148,10 @@ jobs:
         working-directory: ${{ inputs.terraform_directory }}
         run: |
           terraform init \
-            -backend-config="resource_group_name=${{ inputs.BACKEND_RESOURCE_GROUP }}" \
-            -backend-config="storage_account_name=${{ inputs.BACKEND_STORAGE_ACCOUNT }}" \
-            -backend-config="container_name=${{ inputs.BACKEND_CONTAINER_NAME }}" \
-            -backend-config="key=${{ inputs.BACKEND_KEY }}"
+            -backend-config="resource_group_name=${{ vars.BACKEND_RESOURCE_GROUP }}" \
+            -backend-config="storage_account_name=${{ vars.BACKEND_STORAGE_ACCOUNT }}" \
+            -backend-config="container_name=${{ vars.BACKEND_CONTAINER_NAME }}" \
+            -backend-config="key=${{ vars.BACKEND_KEY }}"
         env:
           ARM_CLIENT_ID: ${{ secrets.ARM_CLIENT_ID }}
           ARM_CLIENT_SECRET: ${{ secrets.ARM_CLIENT_SECRET }}

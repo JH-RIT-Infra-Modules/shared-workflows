@@ -16,12 +16,12 @@ All workflows:
 
 ### 🌍 Supported Environments
 
-| Environment | Purpose | GitHub Environment | Destroy Environment |
-|-------------|---------|-------------------|--------------------|
-| `dev` | Development/Testing | `dev` | `dev-destroy` |
-| `test` | Integration Testing | `test` | `test-destroy` |
-| `stage` | Pre-production | `stage` | `stage-destroy` |
-| `prod` | Production | `prod` | `prod-destroy` |
+| Environment | Purpose | GitHub Environment |
+|-------------|---------|-------------------|
+| `dev` | Development/Testing | `dev` |
+| `test` | Integration Testing | `test` |
+| `stage` | Pre-production | `stage` |
+| `prod` | Production | `prod` |
 
 ---
 
@@ -31,7 +31,7 @@ All workflows:
 
 ### 🔐 Required GitHub Environment Secrets (8 Per Environment)
 
-**IMPORTANT:** Secrets must be configured at the **GitHub Environment level**, not repository level. This allows each environment (dev, test, stage, prod) to have its own Azure credentials and backend configuration.
+**IMPORTANT:** Secrets must be configured at the GITHUB ENVIRONMENT level, or the larger repository level. Some secrets and variables maybe shared across different envs, and some may be env specific. This allows each environment (dev, test, stage, prod) to have its own Azure credentials and backend configuration.
 
 | Secret Name | Value | Source | Status |
 |-------------|-------|--------|--------|
@@ -56,10 +56,6 @@ You must create the following GitHub Environments in your repository settings:
 | `test` | Test deployments | Optional |
 | `stage` | Staging deployments | Recommended: Required reviewers |
 | `prod` | Production deployments | **Required: Required reviewers** |
-| `dev-destroy` | Dev destruction approval | Recommended: Required reviewers |
-| `test-destroy` | Test destruction approval | Recommended: Required reviewers |
-| `stage-destroy` | Stage destruction approval | **Required: Required reviewers** |
-| `prod-destroy` | Prod destruction approval | **Required: Required reviewers** |
 
 **To create environments:**
 1. Go to Repository → Settings → Environments
@@ -125,9 +121,9 @@ All workflows initialize Terraform with this backend config:
 
 ```bash
 terraform init \\
-  -backend-config=\"resource_group_name=${{ BACKEND_RESOURCE_GROUP }}\" \\
-  -backend-config=\"storage_account_name=${{ BACKEND_STORAGE_ACCOUNT }}\" \\
-  -backend-config=\"container_name=${{ BACKEND_CONTAINER_NAME }}\" \\
+  -backend-config=\"resource_group_name=${{ vars.BACKEND_RESOURCE_GROUP }}\" \\
+  -backend-config=\"storage_account_name=${{ vars.BACKEND_STORAGE_ACCOUNT }}\" \\
+  -backend-config=\"container_name=${{ vars.BACKEND_CONTAINER_NAME }}\" \\
   -backend-config=\"key=${{ BACKEND_KEY }}\"
 ```
 

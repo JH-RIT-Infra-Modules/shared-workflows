@@ -41,8 +41,6 @@ jobs:
   destroy:
     name: Destroy (${{ inputs.target_env }})
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
     environment: ${{ inputs.target_env }}
     steps:
       - name: Display Warning

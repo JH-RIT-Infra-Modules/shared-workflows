@@ -36,8 +36,6 @@ jobs:
   validate:
     name: Validate (${{ matrix.environment }})
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
     environment: ${{ matrix.environment }}
     steps:
       - name: Display Environment Info

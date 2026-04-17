@@ -191,7 +191,8 @@ jobs:
             -backend-config="resource_group_name=${{ inputs.BACKEND_RESOURCE_GROUP }}" \
             -backend-config="storage_account_name=${{ inputs.BACKEND_STORAGE_ACCOUNT }}" \
             -backend-config="container_name=${{ inputs.BACKEND_CONTAINER_NAME }}" \
-            -backend-config="key=${{ inputs.BACKEND_KEY }}"
+            BACKEND_KEY=$(echo "${{ inputs.BACKEND_KEY }}" | tr -d '\r\n')
+            -backend-config="key=${{ env.BACKEND_KEY }}"
         env:
           ARM_CLIENT_ID: ${{ secrets.ARM_CLIENT_ID }}
           ARM_CLIENT_SECRET: ${{ secrets.ARM_CLIENT_SECRET }}

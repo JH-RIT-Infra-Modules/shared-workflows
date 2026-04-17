@@ -34,13 +34,13 @@ env:
 
 jobs:
   validate:
-    name: Validate (${{ matrix.environment }})
+    name: Validate (${{ inputs.target_env }})
     runs-on: ubuntu-latest
     environment: ${{ inputs.target_env }}
     steps:
       - name: Display Environment Info
         run: |
-          echo "🔍 Validating environment: ${{ matrix.environment }}"
+          echo "🔍 Validating environment: ${{ inputs.target_env }}"
           echo "📁 Terraform directory: ${{ inputs.terraform_directory }}"
 
       - name: Checkout code
@@ -99,7 +99,7 @@ jobs:
       - name: Run TFLint
         working-directory: ${{ inputs.terraform_directory }}
         run: |
-          echo "🔎 Running TFLint for ${{ matrix.environment }}..."
+          echo "🔎 Running TFLint for ${{ inputs.target_env }}..."
           tflint -f compact --minimum-failure-severity=error
           
       - name: Verify Backend Config Secrets
@@ -165,12 +165,12 @@ jobs:
       - name: Terraform Validate
         working-directory: ${{ inputs.terraform_directory }}
         run: |
-          echo "✅ Validating Terraform configuration for ${{ matrix.environment }}..."
-          if [ -f "environments/${{ matrix.environment }}.tfvars" ]; then
+          echo "✅ Validating Terraform configuration for ${{ inputs.target_env }}..."
+          if [ -f "environments/${{ inputs.target_env }}.tfvars" ]; then
             terraform validate
-            echo "📁 Environment-specific tfvars file found: environments/${{ matrix.environment }}.tfvars"
+            echo "📁 Environment-specific tfvars file found: environments/${{ inputs.target_env }}.tfvars"
           else
             terraform validate
             echo "ℹ️  No environment-specific tfvars file found, using defaults"
           fi
-          echo "✅ Validation complete for ${{ matrix.environment }}"
+          echo "✅ Validation complete for ${{ inputs.target_env }}"

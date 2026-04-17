@@ -36,7 +36,7 @@ jobs:
   validate:
     name: Validate (${{ matrix.environment }})
     runs-on: ubuntu-latest
-    environment: ${{ matrix.environment }}
+    environment: ${{ inputs.target_env }}
     steps:
       - name: Display Environment Info
         run: |

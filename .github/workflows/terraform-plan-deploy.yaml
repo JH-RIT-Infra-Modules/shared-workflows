@@ -32,6 +32,11 @@ on:
         required: false
         type: string
         default: '.'
+      terraform_init_upgrade:
+        description: 'Use -upgrade flag during terraform init (updates provider versions)'
+        required: false
+        type: boolean
+        default: true
 env:
   TF_VERSION: ${{ inputs.terraform_version }}
   AZURE_KEYVAULT_NAME: ${{ inputs.azure_keyvault_name }}
@@ -131,7 +136,11 @@ jobs:
       - name: Terraform Init
         working-directory: ${{ inputs.terraform_directory }}
         run: |
-          terraform init \
+          UPGRADE_FLAG=""
+          if [ "${{ inputs.terraform_init_upgrade }}" = "true" ]; then
+            UPGRADE_FLAG="-upgrade"
+          fi
+          terraform init $UPGRADE_FLAG \
             -backend-config="resource_group_name=${{ vars.BACKEND_RESOURCE_GROUP }}" \
             -backend-config="storage_account_name=${{ vars.BACKEND_STORAGE_ACCOUNT }}" \
             -backend-config="container_name=${{ vars.BACKEND_CONTAINER_NAME }}" \
@@ -257,7 +266,11 @@ jobs:
       - name: Terraform Init
         working-directory: ${{ inputs.terraform_directory }}
         run: |
-          terraform init \
+          UPGRADE_FLAG=""
+          if [ "${{ inputs.terraform_init_upgrade }}" = "true" ]; then
+            UPGRADE_FLAG="-upgrade"
+          fi
+          terraform init $UPGRADE_FLAG \
             -backend-config="resource_group_name=${{ vars.BACKEND_RESOURCE_GROUP }}" \
             -backend-config="storage_account_name=${{ vars.BACKEND_STORAGE_ACCOUNT }}" \
             -backend-config="container_name=${{ vars.BACKEND_CONTAINER_NAME }}" \

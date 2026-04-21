@@ -134,13 +134,13 @@ jobs:
             echo '${{ inputs.tf_vars }}' | jq -r 'to_entries[] | select(.key | startswith("TF_VAR_")) | "TF_VAR_" + (.key[7:] | ascii_downcase) + "=" + .value' >> $GITHUB_ENV
           fi
 
-      - name: Debug TF_VAR environment variables
-        run: |
-          echo "📊 TF_VAR environment variables set:"
-          env | grep -i '^TF_VAR_' || echo "⚠️  No TF_VAR_ variables found"
-          echo "---"
-          echo "Raw tf_vars input received:"
-          echo '${{ inputs.tf_vars }}'
+      # - name: Debug TF_VAR environment variables
+      #   run: |
+      #     echo "📊 TF_VAR environment variables set:"
+      #     env | grep -i '^TF_VAR_' || echo "⚠️  No TF_VAR_ variables found"
+      #     echo "---"
+      #     echo "Raw tf_vars input received:"
+      #     echo '${{ inputs.tf_vars }}'
 
       - name: Terraform Init
         working-directory: ${{ inputs.terraform_directory }}

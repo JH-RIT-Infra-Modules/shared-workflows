@@ -175,16 +175,16 @@ jobs:
           fi
           echo "✅ Validation complete for ${{ inputs.target_env }}"
           
-      - name: Create Custom Deployment Status
-        if: always()
-        uses: actions/github-script@v7
-        with:
-          script: |
-            github.rest.repos.createDeploymentStatus({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              deployment_id: context.payload.deployment.id,
-              state: '${{ job.status }}',
-              description: 'Terraform validation ${{ job.status }}',
-              environment_url: ''
-            })
+      # - name: Create Custom Deployment Status
+      #   if: always()
+      #   uses: actions/github-script@v7
+      #   with:
+      #     script: |
+      #       github.rest.repos.createDeploymentStatus({
+      #         owner: context.repo.owner,
+      #         repo: context.repo.repo,
+      #         deployment_id: context.payload.deployment.id,
+      #         state: '${{ job.status }}',
+      #         description: 'Terraform validation ${{ job.status }}',
+      #         environment_url: ''
+      #       })

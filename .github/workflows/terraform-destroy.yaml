@@ -21,11 +21,6 @@ on:
         required: false
         type: string
         default: '{}'
-      azure_keyvault_name:
-        description: 'Name of the Azure Key Vault containing secrets (optional)'
-        required: false
-        type: string
-        default: ''
       terraform_directory:
         description: 'Directory containing Terraform configuration files'
         required: false
@@ -60,27 +55,6 @@ jobs:
         uses: azure/login@v2
         with:
           creds: '{"clientId":"${{ secrets.ARM_CLIENT_ID }}","clientSecret":"${{ secrets.ARM_CLIENT_SECRET }}","subscriptionId":"${{ secrets.ARM_SUBSCRIPTION_ID }}","tenantId":"${{ secrets.ARM_TENANT_ID }}"}'
-
-      - name: Fetch Secrets from Azure Key Vault
-        if: inputs.azure_keyvault_name != ''
-        id: keyvault
-        uses: azure/CLI@v1
-        with:
-          inlineScript: |
-            # Fetch all secrets from Key Vault
-            SECRETS=$(az keyvault secret list --vault-name "${{ inputs.azure_keyvault_name }}" --query "[].name" -o tsv)
-            
-            for SECRET_NAME in $SECRETS; do
-              # Convert secret name to TF_VAR format (TF_VAR_ prefix uppercase, variable name lowercase, replace hyphens with underscores)
-              VARIABLE_NAME=$(echo "${SECRET_NAME}" | tr '[:upper:]' '[:lower:]' | tr '-' '_')
-              ENV_VAR_NAME="TF_VAR_${VARIABLE_NAME}"
-              SECRET_VALUE=$(az keyvault secret show --vault-name "${{ inputs.azure_keyvault_name }}" --name "$SECRET_NAME" --query "value" -o tsv)
-              echo "${ENV_VAR_NAME}=${SECRET_VALUE}" >> $GITHUB_ENV
-              # Mask the secret in logs
-              echo "::add-mask::${SECRET_VALUE}"
-              echo "🔐 Loaded secret: ${ENV_VAR_NAME}"
-            done
-            echo "✅ Secrets loaded from Key Vault: ${{ inputs.azure_keyvault_name }}"
 
       - name: Generate GitHub App Token
         id: app-token
@@ -130,6 +104,13 @@ jobs:
             # For variables prefixed with TF_VAR_, convert variable name to lowercase while keeping TF_VAR_ prefix uppercase
             echo '${{ inputs.tf_vars }}' | jq -r 'to_entries[] | select(.key | startswith("TF_VAR_")) | "TF_VAR_" + (.key[7:] | ascii_downcase) + "=" + .value' >> $GITHUB_ENV
           fi
+        env:
+          TF_VAR_SECRETS: ${{ toJson(secrets) }}
+
+      - name: Set TF_VAR secrets from inherited secrets
+        run: |
+          # Process inherited secrets (only secrets prefixed with TF_VAR_)
+          echo '${{ toJson(secrets) }}' | jq -r 'to_entries[] | select(.key | startswith("TF_VAR_")) | "TF_VAR_" + (.key[7:] | ascii_downcase) + "=" + .value' >> $GITHUB_ENV
 
       - name: Terraform Init
         working-directory: ${{ inputs.terraform_directory }}

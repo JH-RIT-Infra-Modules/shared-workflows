@@ -49,6 +49,7 @@ jobs:
           echo "📋 Planning for environment: ${{ inputs.target_env }}"
           echo "📁 Terraform directory: ${{ inputs.terraform_directory }}"
           echo "Triggered by: ${{ github.event_name }}"
+          echo "DEBUG: TF_VAR_ENVIRONMENT=${{ vars.TF_VAR_ENVIRONMENT }}"
 
       - name: Checkout code
         uses: actions/checkout@v3

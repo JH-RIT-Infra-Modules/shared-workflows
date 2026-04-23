@@ -39,7 +39,6 @@ on:
         default: true
 env:
   TF_VERSION: ${{ inputs.terraform_version }}
-  AZURE_KEYVAULT_NAME: ${{ inputs.azure_keyvault_name }}
 
 jobs:
   plan:
@@ -70,19 +69,19 @@ jobs:
         with:
           inlineScript: |
             # Fetch all secrets from Key Vault
-            SECRETS=$(az keyvault secret list --vault-name "${{ env.AZURE_KEYVAULT_NAME }}" --query "[].name" -o tsv)
+            SECRETS=$(az keyvault secret list --vault-name "${{ inputs.azure_keyvault_name }}" --query "[].name" -o tsv)
             
             for SECRET_NAME in $SECRETS; do
               # Convert secret name to TF_VAR format (TF_VAR_ prefix uppercase, variable name lowercase, replace hyphens with underscores)
               VARIABLE_NAME=$(echo "${SECRET_NAME}" | tr '[:upper:]' '[:lower:]' | tr '-' '_')
               ENV_VAR_NAME="TF_VAR_${VARIABLE_NAME}"
-              SECRET_VALUE=$(az keyvault secret show --vault-name "${{ env.AZURE_KEYVAULT_NAME }}" --name "$SECRET_NAME" --query "value" -o tsv)
+              SECRET_VALUE=$(az keyvault secret show --vault-name "${{ inputs.azure_keyvault_name }}" --name "$SECRET_NAME" --query "value" -o tsv)
               echo "${ENV_VAR_NAME}=${SECRET_VALUE}" >> $GITHUB_ENV
               # Mask the secret in logs
               echo "::add-mask::${SECRET_VALUE}"
               echo "🔐 Loaded secret: ${ENV_VAR_NAME}"
             done
-            echo "✅ Secrets loaded from Key Vault: ${{ env.AZURE_KEYVAULT_NAME }}"
+            echo "✅ Secrets loaded from Key Vault: ${{ inputs.azure_keyvault_name }}"
 
       - name: Generate GitHub App Token
         id: app-token
@@ -224,19 +223,19 @@ jobs:
         with:
           inlineScript: |
             # Fetch all secrets from Key Vault
-            SECRETS=$(az keyvault secret list --vault-name "${{ env.AZURE_KEYVAULT_NAME }}" --query "[].name" -o tsv)
+            SECRETS=$(az keyvault secret list --vault-name "${{ inputs.azure_keyvault_name }}" --query "[].name" -o tsv)
             
             for SECRET_NAME in $SECRETS; do
               # Convert secret name to TF_VAR format (TF_VAR_ prefix uppercase, variable name lowercase, replace hyphens with underscores)
               VARIABLE_NAME=$(echo "${SECRET_NAME}" | tr '[:upper:]' '[:lower:]' | tr '-' '_')
               ENV_VAR_NAME="TF_VAR_${VARIABLE_NAME}"
-              SECRET_VALUE=$(az keyvault secret show --vault-name "${{ env.AZURE_KEYVAULT_NAME }}" --name "$SECRET_NAME" --query "value" -o tsv)
+              SECRET_VALUE=$(az keyvault secret show --vault-name "${{ inputs.azure_keyvault_name }}" --name "$SECRET_NAME" --query "value" -o tsv)
               echo "${ENV_VAR_NAME}=${SECRET_VALUE}" >> $GITHUB_ENV
               # Mask the secret in logs
               echo "::add-mask::${SECRET_VALUE}"
               echo "🔐 Loaded secret: ${ENV_VAR_NAME}"
             done
-            echo "✅ Secrets loaded from Key Vault: ${{ env.AZURE_KEYVAULT_NAME }}"
+            echo "✅ Secrets loaded from Key Vault: ${{ inputs.azure_keyvault_name }}"
 
       - name: Generate GitHub App Token
         id: app-token

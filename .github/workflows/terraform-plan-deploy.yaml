@@ -32,6 +32,10 @@ on:
         required: false
         type: boolean
         default: false
+      custom_runner:
+        description: 'Run on self-hosted runner with this label instead of ubuntu-latest'
+        required: false
+        type: string
 
 env:
   TF_VERSION: ${{ inputs.terraform_version }}
@@ -39,7 +43,7 @@ env:
 jobs:
   plan:
     name: Plan (${{ inputs.target_env }})
-    runs-on: ubuntu-latest
+    runs-on: ${{ inputs.custom_runner || 'ubuntu-latest' }}
     environment: ${{ inputs.target_env }}
     outputs:
       plan-status: ${{ steps.plan.outcome }}
@@ -179,8 +183,8 @@ jobs:
           retention-days: 5
 
   apply:
-    name: Deploy (${{ inputs.target_env }})
-    runs-on: ubuntu-latest
+    name: Apply (${{ inputs.target_env }})
+    runs-on: ${{ inputs.custom_runner || 'ubuntu-latest' }}
     needs: [plan]
     if: ${{ inputs.run_deploy == true }}
     environment: ${{ inputs.target_env }}

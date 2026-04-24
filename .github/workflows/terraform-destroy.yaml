@@ -31,6 +31,11 @@ on:
         required: false
         type: boolean
         default: false
+      custom_runner:
+        description: 'Run on self-hosted runner with this label instead of ubuntu-latest'
+        required: false
+        type: string
+      
 
 env:
   TF_VERSION: ${{ inputs.terraform_version }}
@@ -38,7 +43,7 @@ env:
 jobs:
   destroy:
     name: Destroy (${{ inputs.target_env }})
-    runs-on: ubuntu-latest
+    runs-on: ${{ inputs.custom_runner || 'ubuntu-latest' }}
     environment: ${{ inputs.target_env }}
     steps:
       - name: Display Warning

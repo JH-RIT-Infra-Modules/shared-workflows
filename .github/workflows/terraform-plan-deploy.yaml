@@ -183,7 +183,7 @@ jobs:
           retention-days: 5
 
   apply:
-    name: Deploy (${{ inputs.target_env }})
+    name: Apply (${{ inputs.target_env }})
     runs-on: ${{ inputs.custom_runner || 'ubuntu-latest' }}
     needs: [plan]
     if: ${{ inputs.run_deploy == true }}

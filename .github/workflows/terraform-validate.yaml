@@ -132,7 +132,7 @@ jobs:
             UPGRADE_FLAG="-upgrade"
           fi
           terraform init $UPGRADE_FLAG \
-            $( [ -z "${{ secrets.BACKEND_SUBSCRIPTION_ID }}" ] || echo -backend-config="subscription_id=${{ secrets.BACKEND_SUBSCRIPTION_ID }}" ) \
+            $( [ -z "${{ secrets.BACKEND_SUBSCRIPTION_ID }}" ] || echo -backend-config="subscription_id=${{ secrets.BACKEND_SUBSCRIPTION_ID }}" ) \ ##  if BACKEND_SUBSCRIPTION_ID is empty, ARM_SUBSCRIPTION_ID will be used from the Azure Login step, otherwise use the provided BACKEND_SUBSCRIPTION_ID
             -backend-config="resource_group_name=${{ vars.BACKEND_RESOURCE_GROUP }}" \
             -backend-config="storage_account_name=${{ vars.BACKEND_STORAGE_ACCOUNT }}" \
             -backend-config="container_name=${{ vars.BACKEND_CONTAINER_NAME }}" \

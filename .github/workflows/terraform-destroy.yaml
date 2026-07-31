@@ -35,7 +35,11 @@ on:
         description: 'Run on self-hosted runner with this label instead of ubuntu-latest'
         required: false
         type: string
-      
+      command_override:
+        description: 'Additional flags to append to the primary Terraform command (e.g., "-target=module.foo")'
+        required: false
+        type: string
+        default: ''
 
 env:
   TF_VERSION: ${{ inputs.terraform_version }}
@@ -140,10 +144,14 @@ jobs:
         working-directory: ${{ inputs.terraform_directory }}
         run: |
           echo "📋 Generating destroy plan for ${{ inputs.target_env }}..."
+          OVERRIDE_FLAG=""
+          if [ -n "${{ inputs.command_override }}" ]; then
+            OVERRIDE_FLAG="${{ inputs.command_override }}"
+          fi
           if [ -f "environments/${{ inputs.target_env }}.tfvars" ]; then
-            terraform plan -destroy -var-file="environments/${{ inputs.target_env }}.tfvars" -out=tfdestroy
+            terraform plan -destroy $OVERRIDE_FLAG -var-file="environments/${{ inputs.target_env }}.tfvars" -out=tfdestroy
           else
-            terraform plan -destroy -out=tfdestroy
+            terraform plan -destroy $OVERRIDE_FLAG -out=tfdestroy
           fi
 
       - name: Terraform Destroy

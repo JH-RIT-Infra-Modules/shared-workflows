@@ -50,6 +50,20 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
 
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Checkov
+        run: python -m pip install checkov
+
+      - name: Run Checkov Security Scan
+        working-directory: ${{ inputs.terraform_directory }}
+        run: |
+          echo "🔒 Running Checkov security scan for ${{ inputs.target_env }}..."
+          checkov --directory . --soft-fail --skip-path .terraform node_modules .serverless
+
       - name: Azure Login
         uses: azure/login@v2
         with:

@@ -4,7 +4,7 @@
 
 This project uses GitHub Actions to automate Terraform infrastructure deployment to Azure. The CI/CD pipeline consists of three main workflows that support **multi-environment parallel execution**:
 
-1. **`validate.yaml`** - Validates and lints Terraform code across all environments (dev, test, stage, prod)
+1. **`validate.yaml`** - Validates, lints, and scans Terraform code for security misconfigurations across all environments (dev, test, stage, prod)
 2. **`plan-deploy.yaml`** - Plans and applies Terraform changes across selected environments
 3. **`destroy.yaml`** - Destroys infrastructure in selected environments (manual trigger with confirmation)
 
@@ -13,6 +13,7 @@ All workflows:
 - ✅ Support **environment-specific secrets** via GitHub Environments
 - ✅ Support **environment-specific tfvars** files
 - ✅ Authenticate with Azure using Service Principal credentials
+- ✅ Include **security scanning** via Checkov (static analysis for Terraform)
 
 ### 🌍 Supported Environments
 
@@ -190,7 +191,7 @@ Before deploying, verify:
 │           TERRAFORM CI/CD PIPELINE (Multi-Environment)          │
 └─────────────────────────────────────────────────────────────────┘
 
-1️⃣  VALIDATE (Automatic on PR/Push) - Parallel Matrix Execution
+     1️⃣  VALIDATE (Automatic on PR/Push) - Parallel Matrix Execution
     ┌─────────────────────────────────────────────────────────┐
     │  ┌─────────┐ ┌─────────┐ ┌─────────┐ ┌─────────┐       │
     │  │   DEV   │ │  TEST   │ │  STAGE  │ │  PROD   │       │
@@ -198,6 +199,7 @@ Before deploying, verify:
     │  │ TFLint  │ │ TFLint  │ │ TFLint  │ │ TFLint  │       │
     │  │ Format  │ │ Format  │ │ Format  │ │ Format  │       │
     │  │Validate │ │Validate │ │Validate │ │Validate │       │
+    │  │Checkov │ │Checkov │ │Checkov │ │Checkov │       │
     │  └─────────┘ └─────────┘ └─────────┘ └─────────┘       │
     └─────────────────────────────────────────────────────────┘
     
@@ -267,7 +269,7 @@ PARALLEL: DESTROY (Manual Trigger + Confirmation Required)
 - Manual dispatch with environment selection
 
 ### 🎯 Purpose
-Validate Terraform code syntax, format, and configuration across all environments in parallel.
+Validate Terraform code syntax, format, configuration, and security across all environments in parallel.
 
 ### 📥 Inputs (Manual Dispatch)
 
@@ -292,21 +294,44 @@ Parses the environment input and prepares the matrix.
 |------|---------|----------|
 | 1. Display Info | Echo environment | Show which environment is being validated |
 | 2. Checkout Code | `actions/checkout@v3` | Retrieve repository code |
-| 3. Setup Terraform | `hashicorp/setup-terraform@v2` | Install Terraform v1.5.0 |
-| 4. Debug Secrets | Check secret presence | Verify credentials are configured |
-| 5. Azure Login | `azure/login@v2` | Authenticate using environment's Service Principal |
-| 6. Setup TFLint | `terraform-linters/setup-tflint@v3` | Install Terraform linter tool |
-| 7. Initialize TFLint | `tflint --init` | Download TFLint plugins |
-| 8. Run TFLint | `tflint -f compact` | Check for best practices violations |
-| 9. Terraform Init | `terraform init` | Initialize with environment's backend config |
-| 10. Format Check | `terraform fmt -check -recursive` | Verify code formatting |
-| 11. Validate | `terraform validate` | Validate configuration (uses env tfvars if present) |
+| 3. Setup Python | `actions/setup-python@v5` | Install Python 3.11 for Checkov |
+| 4. Install Checkov | `pip install checkov` | Install security scanning tool |
+| 5. Run Checkov | `checkov --directory . --soft-fail` | Scan for security misconfigurations |
+| 6. Setup Terraform | `hashicorp/setup-terraform@v2` | Install Terraform v1.5.0 |
+| 7. Debug Secrets | Check secret presence | Verify credentials are configured |
+| 8. Azure Login | `azure/login@v2` | Authenticate using environment's Service Principal |
+| 9. Setup TFLint | `terraform-linters/setup-tflint@v3` | Install Terraform linter tool |
+| 10. Initialize TFLint | `tflint --init` | Download TFLint plugins |
+| 11. Run TFLint | `tflint -f compact` | Check for best practices violations |
+| 12. Terraform Init | `terraform init` | Initialize with environment's backend config |
+| 13. Format Check | `terraform fmt -check -recursive` | Verify code formatting |
+| 14. Validate | `terraform validate` | Validate configuration (uses env tfvars if present) |
 
 ### ✅ Success Criteria
 - ✅ All environments pass validation in parallel
 - ✅ All linting checks pass (no TFLint errors)
 - ✅ Code formatting is consistent
 - ✅ Terraform configuration is valid for all environments
+- ✅ Security scan passes (Checkov reports only warnings, not blocking failures)
+
+### 🔒 Security Scanning (Checkov)
+
+Checkov runs automatically during validation and scans Terraform files for security misconfigurations. It checks for over 1000 security policies covering Azure, AWS, and GCP.
+
+**Key features:**
+- Scans `.tf` files for security misconfigurations
+- Supports suppression comments: `#checkov:skip=CKV_AZURE_1:reason`
+- Runs with `--soft-fail` so it reports issues without blocking deployment
+- Skips `.terraform`, `node_modules`, and `.serverless` directories by default
+
+**Suppressing false positives:**
+```hcl
+resource "azurerm_storage_account" "example" {
+  #checkov:skip=CKV_AZURE_1:The storage account intentionally allows public access
+  name                = "mystorageaccount"
+  # ...
+}
+```
 
 ### ❌ Failure Handling
 - ❌ `fail-fast: false` - Other environments continue even if one fails

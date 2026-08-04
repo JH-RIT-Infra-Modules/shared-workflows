@@ -62,7 +62,7 @@ jobs:
         working-directory: ${{ inputs.terraform_directory }}
         run: |
           echo "🔒 Running Checkov security scan for ${{ inputs.target_env }}..."
-          checkov --directory . --soft-fail --skip-path .terraform node_modules .serverless
+          checkov --directory . --soft-fail --skip-path .terraform --skip-path node_modules --skip-path .serverless
 
       - name: Azure Login
         uses: azure/login@v2

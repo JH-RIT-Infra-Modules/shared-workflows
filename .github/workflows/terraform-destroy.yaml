@@ -50,6 +50,8 @@ jobs:
     name: Destroy (${{ inputs.target_env }})
     runs-on: ${{ inputs.custom_runner || 'ubuntu-latest' }}
     environment: ${{ inputs.target_env }}
+    permissions:
+      contents: write
     steps:
       - name: Display Warning
         run: |
@@ -58,7 +60,7 @@ jobs:
           echo "⚠️  This action is IRREVERSIBLE!"
 
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Azure Login
         uses: azure/login@v2

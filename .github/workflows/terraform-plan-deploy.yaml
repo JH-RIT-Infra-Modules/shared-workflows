@@ -51,6 +51,8 @@ jobs:
     name: Plan (${{ inputs.target_env }})
     runs-on: ${{ inputs.custom_runner || 'ubuntu-latest' }}
     environment: ${{ inputs.target_env }}
+    permissions:
+      contents: write
     outputs:
       plan-status: ${{ steps.plan.outcome }}
     steps:
@@ -61,7 +63,7 @@ jobs:
           echo "Triggered by: ${{ github.event_name }}"
 
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Azure Login
         uses: azure/login@v2
@@ -199,6 +201,8 @@ jobs:
     needs: [plan]
     if: ${{ inputs.run_deploy == true }}
     environment: ${{ inputs.target_env }}
+    permissions:
+      contents: write
     steps:
       - name: Display Deployment Info
         run: |
@@ -206,7 +210,7 @@ jobs:
           echo "📁 Terraform directory: ${{ inputs.terraform_directory }}"
 
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Azure Login
         uses: azure/login@v2

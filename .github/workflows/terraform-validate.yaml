@@ -73,7 +73,7 @@ jobs:
         working-directory: ${{ inputs.terraform_directory }}
         run: |
           echo "🔒 Running Checkov security scan for ${{ inputs.target_env }}..."
-          checkov --directory . --soft-fail --skip-path .terraform --skip-path node_modules --skip-path .serverless --output sarif --file checkov-results.sarif --config-file ./central-config/.checkov.yaml
+          checkov --config-file ./central-config/.checkov.yaml --directory . --soft-fail --skip-path .terraform --skip-path node_modules --skip-path .serverless --output sarif --file checkov-results.sarif
 
       - name: Upload Checkov SARIF to PR
         if: env.GITHUB_HEAD_REF != ''

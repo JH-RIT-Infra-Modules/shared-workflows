@@ -61,11 +61,19 @@ jobs:
       - name: Install Checkov
         run: python -m pip install checkov
 
+      - name: Fetch Global Config & Rules
+        uses: actions/checkout@v4
+        with:
+          repository: 'JH-RIT-Infra-Modules/checkov-config'
+          path: 'central-config' # Isolates config file away from client project root
+          # Optional: Use a specific release tag/branch for predictability
+          ref: 'main'
+
       - name: Run Checkov Security Scan
         working-directory: ${{ inputs.terraform_directory }}
         run: |
           echo "🔒 Running Checkov security scan for ${{ inputs.target_env }}..."
-          checkov --directory . --soft-fail --skip-path .terraform --skip-path node_modules --skip-path .serverless --output sarif --file checkov-results.sarif
+          checkov --directory . --soft-fail --skip-path .terraform --skip-path node_modules --skip-path .serverless --output sarif --file checkov-results.sarif --config-file ./central-config/.checkov.yaml
 
       - name: Upload Checkov SARIF to PR
         if: env.GITHUB_HEAD_REF != ''

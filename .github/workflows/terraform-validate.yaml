@@ -61,13 +61,13 @@ jobs:
       - name: Install Checkov
         run: python -m pip install checkov
 
-      - name: Fetch Global Config & Rules
-        uses: actions/checkout@v4
-        with:
-          repository: 'JH-RIT-Infra-Modules/checkov-config'
-          path: 'central-config' # Isolates config file away from client project root
-          # Optional: Use a specific release tag/branch for predictability
-          ref: 'main'
+      # - name: Fetch Global Config & Rules
+      #   uses: actions/checkout@v4
+      #   with:
+      #     repository: 'JH-RIT-Infra-Modules/checkov-config'
+      #     path: 'central-config' # Isolates config file away from client project root
+      #     # Optional: Use a specific release tag/branch for predictability
+      #     ref: 'main'
 
       - name: Run Checkov Security Scan
         working-directory: ${{ inputs.terraform_directory }}

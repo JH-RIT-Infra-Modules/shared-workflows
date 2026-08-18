@@ -1,0 +1,10 @@
+metadata:
+  name: "Ensure all resources have an Owner tag"
+  id: "CKV_CUSTOM_001"
+  category: "GENERAL_SECURITY"
+definition:
+  cond:
+    - key: "tags.Owner"
+      operator: "exists"
+    - key: "tags.IaC"
+      operator: "exists"

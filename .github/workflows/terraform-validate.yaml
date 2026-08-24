@@ -53,13 +53,19 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup Python
-        uses: actions/setup-python@v5
+      - name: Run Checkov
+        uses: bridgecrewio/checkov-action@master
         with:
-          python-version: '3.11'
+          directory: .
+          config_file: "${{ github.workspace }}/central-config/.checkov.yaml"
 
-      - name: Install Checkov
-        run: python -m pip install checkov
+      # - name: Setup Python
+      #   uses: actions/setup-python@v5
+      #   with:
+      #     python-version: '3.11'
+
+      # - name: Install Checkov
+      #   run: python -m pip install checkov
 
       # - name: Fetch Global Config & Rules
       #   uses: actions/checkout@v4
@@ -69,19 +75,19 @@ jobs:
       #     # Optional: Use a specific release tag/branch for predictability
       #     ref: 'main'
 
-      - name: Run Checkov Security Scan
-        working-directory: ${{ inputs.terraform_directory }}
-        run: |
-          echo "🔒 Running Checkov security scan for ${{ inputs.target_env }}..."
-          ls -la "${{ github.workspace }}/central-config/.checkov.yaml"
-          checkov --config-file "${{ github.workspace }}/central-config/.checkov.yaml" --directory . --soft-fail --skip-path .terraform --skip-path node_modules --skip-path .serverless --output sarif --file checkov-results.sarif
+      # - name: Run Checkov Security Scan
+      #   working-directory: ${{ inputs.terraform_directory }}
+      #   run: |
+      #     echo "🔒 Running Checkov security scan for ${{ inputs.target_env }}..."
+      #     ls -la "${{ github.workspace }}/central-config/.checkov.yaml"
+      #     checkov --config-file "${{ github.workspace }}/central-config/.checkov.yaml" --directory . --soft-fail --skip-path .terraform --skip-path node_modules --skip-path .serverless --output sarif --file checkov-results.sarif
 
-      - name: Upload Checkov SARIF to PR
-        if: env.GITHUB_HEAD_REF != ''
-        uses: github/codeql-action/upload-sarif@v2
-        with:
-          sarif_file: ${{ inputs.terraform_directory }}/checkov-results.sarif
-          category: checkov
+      # - name: Upload Checkov SARIF to PR
+      #   if: env.GITHUB_HEAD_REF != ''
+      #   uses: github/codeql-action/upload-sarif@v2
+      #   with:
+      #     sarif_file: ${{ inputs.terraform_directory }}/checkov-results.sarif
+      #     category: checkov
 
       - name: Azure Login
         uses: azure/login@v2

@@ -56,8 +56,9 @@ jobs:
       - name: Run Checkov
         uses: bridgecrewio/checkov-action@master
         with:
-          directory: .
-          config_file: "${{ github.workspace }}/central-config/.checkov.yaml"
+          directory: ${{ inputs.terraform_directory }}
+          config_file: "./central-config/.checkov.yaml"
+          download_external_modules: true
 
       # - name: Setup Python
       #   uses: actions/setup-python@v5

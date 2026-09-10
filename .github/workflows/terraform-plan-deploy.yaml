@@ -66,7 +66,7 @@ jobs:
       - name: Install Azure CLI
         run: |
           if ! command -v az >/dev/null 2>&1; then
-            curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash
+            curl -sL https://aka.ms/InstallAzureCLIDeb | bash
           fi
           az version
 
@@ -91,7 +91,7 @@ jobs:
         uses: hashicorp/setup-terraform@v2
         with:
           terraform_version: ${{ env.TF_VERSION }}
-          
+
       - name: Verify Backend Config Secrets
         run: |
           # Report existence of required backend secrets.
@@ -218,7 +218,7 @@ jobs:
       - name: Install Azure CLI
         run: |
           if ! command -v az >/dev/null 2>&1; then
-            curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash
+            curl -sL https://aka.ms/InstallAzureCLIDeb | bash
           fi
           az version
 

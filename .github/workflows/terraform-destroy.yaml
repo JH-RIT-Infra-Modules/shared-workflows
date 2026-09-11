@@ -15,7 +15,7 @@ on:
         description: 'Terraform version to use'
         required: false
         type: string
-        default: '1.14.5'
+        default: '1.16.2'
       tf_vars:
         description: 'JSON object of TF_VAR_ environment variables (e.g., {"foo": "bar"})'
         required: false

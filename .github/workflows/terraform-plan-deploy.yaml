@@ -37,6 +37,11 @@ on:
         required: false
         type: string
         default: '["self-hosted", "azure-terraform"]'
+      run_without_runner_caches:
+        description: 'Run build.sh without runner cache environment variables'
+        required: false
+        type: boolean
+        default: false
       command_override:
         description: 'Additional flags to append to the primary Terraform command (e.g., "-target=module.foo")'
         required: false
@@ -63,6 +68,15 @@ jobs:
 
       - name: Checkout code
         uses: actions/checkout@v3
+
+      - name: Run without runner caches
+        if: ${{ inputs.run_without_runner_caches }}
+        run: |
+          env -u TF_PLUGIN_CACHE_DIR \
+              -u NPM_CONFIG_CACHE \
+              -u PIP_CACHE_DIR \
+              -u MAVEN_OPTS \
+              ./build.sh
 
       - name: Install Azure CLI
         run: |
@@ -216,6 +230,15 @@ jobs:
 
       - name: Checkout code
         uses: actions/checkout@v3
+
+      - name: Run without runner caches
+        if: ${{ inputs.run_without_runner_caches }}
+        run: |
+          env -u TF_PLUGIN_CACHE_DIR \
+              -u NPM_CONFIG_CACHE \
+              -u PIP_CACHE_DIR \
+              -u MAVEN_OPTS \
+              ./build.sh
 
       - name: Install Azure CLI
         run: |

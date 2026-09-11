@@ -36,6 +36,7 @@ on:
         description: 'Run on self-hosted runner with this label instead of ubuntu-latest'
         required: false
         type: string
+        default: 'azure-terraform'
       command_override:
         description: 'Additional flags to append to the primary Terraform command (e.g., "-target=module.foo")'
         required: false

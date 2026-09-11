@@ -33,10 +33,10 @@ on:
         type: boolean
         default: false
       custom_runner:
-        description: 'Run on self-hosted runner with this label instead of ubuntu-latest'
+        description: 'JSON array of runner labels, for example ["self-hosted", "azure-terraform"]'
         required: false
         type: string
-        default: 'azure-terraform'
+        default: '["self-hosted", "azure-terraform"]'
       command_override:
         description: 'Additional flags to append to the primary Terraform command (e.g., "-target=module.foo")'
         required: false
@@ -50,7 +50,7 @@ env:
 jobs:
   plan:
     name: Plan (${{ inputs.target_env }})
-    runs-on: ${{ inputs.custom_runner || 'ubuntu-latest' }}
+    runs-on: ${{ fromJSON(inputs.custom_runner || '["ubuntu-latest"]') }}
     environment: ${{ inputs.target_env }}
     outputs:
       plan-status: ${{ steps.plan.outcome }}
@@ -204,7 +204,7 @@ jobs:
 
   apply:
     name: Apply (${{ inputs.target_env }})
-    runs-on: ${{ inputs.custom_runner || 'ubuntu-latest' }}
+    runs-on: ${{ fromJSON(inputs.custom_runner || '["ubuntu-latest"]') }}
     needs: [plan]
     if: ${{ inputs.run_deploy == true }}
     environment: ${{ inputs.target_env }}

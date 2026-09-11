@@ -28,10 +28,10 @@ on:
         type: boolean
         default: false
       custom_runner:
-        description: 'Run on self-hosted runner with this label instead of ubuntu-latest'
+        description: 'JSON array of runner labels, for example ["self-hosted", "azure-terraform"]'
         required: false
         type: string
-        default: 'azure-terraform'
+        default: '["self-hosted", "azure-terraform"]'
 
 env:
   TF_VERSION: ${{ inputs.terraform_version }}
@@ -40,7 +40,7 @@ env:
 jobs:
   validate:
     name: Validate (${{ inputs.target_env }})
-    runs-on: ${{ inputs.custom_runner || 'ubuntu-latest' }}
+    runs-on: ${{ fromJSON(inputs.custom_runner || '["ubuntu-latest"]') }}
     environment: ${{ inputs.target_env }}
     steps:
       - name: Display Environment Info

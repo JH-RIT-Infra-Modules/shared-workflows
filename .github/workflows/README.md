@@ -25,6 +25,151 @@ All workflows:
 
 ---
 
+## 🖥️ Custom GitHub Actions Runners
+
+All workflows support **custom self-hosted runners** deployed as Azure Container Apps Jobs. The runner infrastructure is defined in the [`jh-rit-hosted-gh-runner`](https://github.com/JH-RIT-Infra-Modules/jh-rit-hosted-gh-runner) repository and provides three pre-built runner images, each optimized for different workload types.
+
+### Runner Image Overview
+
+| Label | Image | Base | CPU | Memory | Docker-in-Docker | Purpose |
+|-------|-------|------|-----|--------|------------------|---------||
+| `azure-terraform` | `jhritops.azurecr.io/terraform:latest` | `actions-runner:latest` | 2.0 vCPU | 4Gi | No | Terraform deployments, Azure infrastructure |
+| `azure-serverless` | `jhritops.azurecr.io/gh-serverless-unified:latest` | `actions-runner:latest` | 2.0 vCPU | 4Gi | No | Azure Functions (Node, Python, Java, .NET) |
+| `azure-dind` | `jhritops.azurecr.io/gh-dind-runner:latest` | `actions-runner:latest` | 4.0 vCPU | 8Gi | **Yes** | Container image builds, Docker operations |
+
+### Runner Images — Installed Tools
+
+#### `azure-terraform` Runner
+- **Node.js 20** — for tooling that requires Node
+- **Azure CLI** — for Azure resource management
+- **Terraform 1.12.2** — infrastructure-as-code tooling
+- Base image: `ghcr.io/actions/actions-runner:latest`
+
+#### `azure-serverless` Runner
+- **Node.js 20** — Azure Functions (Node.js runtime)
+- **Python 3 + pip + venv** — Azure Functions (Python runtime)
+- **Java 17 (Temurin) + Maven** — Azure Functions (Java runtime)
+- **.NET 8 SDK** — Azure Functions (.NET runtime)
+- **Azure Functions Core Tools v4** — local function development & testing
+- **Azure CLI** — cross-platform Azure resource management
+- Base image: `ghcr.io/actions/actions-runner:latest`
+
+#### `azure-dind` Runner (Docker-in-Docker)
+- **Docker CLI + Docker daemon** — full container build/push capability
+- **Node.js 20** — Azure Functions (Node.js runtime)
+- **Python 3 + pip + venv** — Azure Functions (Python runtime)
+- **Java 17 (Temurin) + Maven** — Azure Functions (Java runtime)
+- **.NET 8 SDK** — Azure Functions (.NET runtime)
+- **Azure Functions Core Tools v4** — local function development & testing
+- **Azure CLI** — cross-platform Azure resource management
+- Base image: `ghcr.io/actions/actions-runner:latest`
+
+### How Runners Work with Workflows
+
+The `terraform-plan-deploy.yaml` workflow accepts two inputs that control runner selection:
+
+| Input | Type | Default | Description |
+|-------|------|---------|-------------|
+| `custom_runner` | JSON array | `["self-hosted", "azure-terraform"]` | Runner labels to target. Example: `["self-hosted", "azure-dind"]` for Docker-in-Docker workloads. |
+| `run_without_runner_caches` | boolean | `false` | When `true`, runs `build.sh` with cache environment variables (`TF_PLUGIN_CACHE_DIR`, `NPM_CONFIG_CACHE`, `PIP_CACHE_DIR`, `MAVEN_OPTS`) **unset**, forcing a cache-free build. |
+
+**Example: Using the Docker-in-Docker runner for a workflow that builds container images:**
+
+```yaml
+- uses: JH-RIT-Infra-Modules/shared-workflows/.github/workflows/terraform-plan-deploy.yaml@main
+  with:
+    target_env: dev
+    run_deploy: true
+    custom_runner: '["self-hosted", "azure-dind"]'
+```
+
+**Example: Running without any runner caches (useful for troubleshooting cache issues):**
+
+```yaml
+- uses: JH-RIT-Infra-Modules/shared-workflows/.github/workflows/terraform-plan-deploy.yaml@main
+  with:
+    target_env: dev
+    run_deploy: true
+    run_without_runner_caches: true
+```
+
+### Image Build & Cache System
+
+Runner images are built and pushed via [`build-image.sh`](https://github.com/JH-RIT-Infra-Modules/jh-rit-hosted-gh-runner/blob/main/build-image.sh) using **Docker BuildKit registry caching**:
+
+```
+Dockerfile → docker buildx → jhritops.azurecr.io/<image>:latest
+                                        ↕
+                              :buildcache (layer cache)
+```
+
+- Each image stores its build cache at the corresponding `:buildcache` tag in Azure Container Registry (ACR)
+- Subsequent builds reuse unchanged Dockerfile layers, significantly reducing build times
+- To add a new runner image, add an entry to `IMAGE_DEFINITIONS` in `build-image.sh` and create the corresponding Dockerfile
+
+### Ephemeral Runners & Dependency Caching
+
+Container App Job runners are **ephemeral** — each workflow execution creates a new container. To speed up repeated builds:
+
+1. **Use GitHub Actions cache** for tool dependencies:
+   ```yaml
+   - uses: actions/cache@v4
+     with:
+       path: ~/.terraform.d/plugin-cache
+       key: terraform-${{ runner.os }}-${{ hashFiles('**/.terraform.lock.hcl') }}
+   ```
+
+2. **Cache paths** for common tools:
+   - Terraform: `~/.terraform.d/plugin-cache`
+   - npm: `~/.npm`
+   - pip: `~/.cache/pip`
+   - Maven: `~/.m2/repository`
+
+3. **Shared Azure Files share** — a 100 GiB Azure Files share is mounted at `/cache` on all runners. This is shared across runner executions and can store common package-manager caches. **Do not store credentials, build outputs, or run-specific state here.**
+
+### Runner Deployment (Terraform)
+
+Runners are deployed via Terraform in the `jh-rit-hosted-gh-runner` repository. The `runner_definitions` variable controls all runner configurations:
+
+```hcl
+runner_definitions = [
+  {
+    job_name            = "gh-terraform-runner-job"
+    container_name      = "github-runner"
+    image               = "jhritops.azurecr.io/terraform:latest"
+    label               = "azure-terraform"
+    identity_suffix     = "terraform"
+    cpu                 = "2.0"
+    memory              = "4Gi"
+    start_docker_daemon = false
+  },
+  {
+    job_name            = "gh-serverless-unified-runner-job"
+    container_name      = "github-serverless-unified-runner"
+    image               = "jhritops.azurecr.io/gh-serverless-unified:latest"
+    label               = "azure-serverless"
+    identity_suffix     = "serverless-unified"
+    cpu                 = "2.0"
+    memory              = "4Gi"
+    start_docker_daemon = false
+  },
+  {
+    job_name            = "gh-dind-runner-job"
+    container_name      = "github-dind-runner"
+    image               = "jhritops.azurecr.io/gh-dind-runner:latest"
+    label               = "azure-dind"
+    identity_suffix     = "dind"
+    cpu                 = "4.0"
+    memory              = "8Gi"
+    start_docker_daemon = true
+  }
+]
+```
+
+To add a new runner, add an object to this list and deploy with Terraform.
+
+---
+
 ## ⚠️ PREREQUISITES & REQUIRED SETUP
 
 **IMPORTANT:** Before any workflows can execute, you must complete this setup. Without these prerequisites, all workflows will fail with authentication errors.

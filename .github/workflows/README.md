@@ -35,7 +35,7 @@ All workflows support **custom self-hosted runners** deployed as Azure Container
 |-------|-------|------|-----|--------|------------------|---------||
 | `azure-terraform` | `jhritops.azurecr.io/terraform:latest` | `actions-runner:latest` | 2.0 vCPU | 4Gi | No | Terraform deployments, Azure infrastructure |
 | `azure-serverless` | `jhritops.azurecr.io/gh-serverless-unified:latest` | `actions-runner:latest` | 2.0 vCPU | 4Gi | No | Azure Functions (Node, Python, Java, .NET) |
-| `azure-dind` | `jhritops.azurecr.io/gh-dind-runner:latest` | `actions-runner:latest` | 4.0 vCPU | 8Gi | **Yes** | Container image builds, Docker operations |
+| `azure-container` | `jhritops.azurecr.io/gh-dind-runner:latest` | `actions-runner:latest` | 4.0 vCPU | 8Gi | **Yes** | Container image builds, Docker operations |
 
 ### Runner Images — Installed Tools
 
@@ -54,7 +54,7 @@ All workflows support **custom self-hosted runners** deployed as Azure Container
 - **Azure CLI** — cross-platform Azure resource management
 - Base image: `ghcr.io/actions/actions-runner:latest`
 
-#### `azure-dind` Runner (Docker-in-Docker)
+#### `azure-container` Runner (Docker-in-Docker)
 - **Docker CLI + Docker daemon** — full container build/push capability
 - **Node.js 20** — Azure Functions (Node.js runtime)
 - **Python 3 + pip + venv** — Azure Functions (Python runtime)
@@ -70,7 +70,7 @@ The `terraform-plan-deploy.yaml` workflow accepts two inputs that control runner
 
 | Input | Type | Default | Description |
 |-------|------|---------|-------------|
-| `custom_runner` | JSON array | `["self-hosted", "azure-terraform"]` | Runner labels to target. Example: `["self-hosted", "azure-dind"]` for Docker-in-Docker workloads. |
+| `custom_runner` | JSON array | `["self-hosted", "azure-terraform"]` | Runner labels to target. Example: `["self-hosted", "azure-container"]` for Docker-in-Docker workloads. |
 | `run_without_runner_caches` | boolean | `false` | When `true`, runs `build.sh` with cache environment variables (`TF_PLUGIN_CACHE_DIR`, `NPM_CONFIG_CACHE`, `PIP_CACHE_DIR`, `MAVEN_OPTS`) **unset**, forcing a cache-free build. |
 
 **Example: Using the Docker-in-Docker runner for a workflow that builds container images:**
@@ -80,7 +80,7 @@ The `terraform-plan-deploy.yaml` workflow accepts two inputs that control runner
   with:
     target_env: dev
     run_deploy: true
-    custom_runner: '["self-hosted", "azure-dind"]'
+    custom_runner: '["self-hosted", "azure-container"]'
 ```
 
 **Example: Running without any runner caches (useful for troubleshooting cache issues):**
@@ -157,7 +157,7 @@ runner_definitions = [
     job_name            = "gh-dind-runner-job"
     container_name      = "github-dind-runner"
     image               = "jhritops.azurecr.io/gh-dind-runner:latest"
-    label               = "azure-dind"
+    label               = "azure-container"
     identity_suffix     = "dind"
     cpu                 = "4.0"
     memory              = "8Gi"

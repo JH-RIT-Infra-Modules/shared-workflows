@@ -174,20 +174,22 @@ To add a new runner, add an object to this list and deploy with Terraform.
 
 **IMPORTANT:** Before any workflows can execute, you must complete this setup. Without these prerequisites, all workflows will fail with authentication errors.
 
-### 🔐 Required GitHub Environment Secrets (8 Per Environment)
+### 🔐 Required GitHub Environment Configuration
 
-**IMPORTANT:** Secrets must be configured at the GITHUB ENVIRONMENT level, or the larger repository level. Some secrets and variables maybe shared across different envs, and some may be env specific. This allows each environment (dev, test, stage, prod) to have its own Azure credentials and backend configuration.
+**IMPORTANT:** Configure credentials as GitHub Environment secrets and backend location as GitHub Environment variables. This allows each environment (dev, test, stage, prod) to have its own Azure credentials and backend configuration.
 
 | Secret Name | Value | Source | Status |
 |-------------|-------|--------|--------|
-| `ARM_CLIENT_ID` | Service Principal Client ID | Azure Portal | ✅ Required |
-| `ARM_CLIENT_SECRET` | Service Principal Client Secret | Azure Portal | ✅ Required |
-| `ARM_SUBSCRIPTION_ID` | Azure Subscription ID | Azure Portal | ✅ Required |
-| `ARM_TENANT_ID` | Azure Tenant/Directory ID | Azure Portal | ✅ Required |
+| `AZURE_CLIENT_ID` | OIDC application client ID | Azure Portal | ✅ Required |
+| `AZURE_TENANT_ID` | Azure Tenant/Directory ID | Azure Portal | ✅ Required |
+| `AZURE_SUBSCRIPTION_ID` | Deployment subscription ID | Azure Portal | ✅ Required |
+
+| Environment Variable | Value | Source | Status |
+|----------------------|-------|--------|--------|
 | `BACKEND_RESOURCE_GROUP` | Resource Group for Terraform state | Azure Portal | ✅ Required |
 | `BACKEND_STORAGE_ACCOUNT` | Storage Account name for state | Azure Portal | ✅ Required |
 | `BACKEND_CONTAINER_NAME` | Container name in storage account | Azure Portal | ✅ Required |
-| `BACKEND_KEY` | State file blob name | Any (e.g., `terraform.tfstate`) | ✅ Required |
+| `BACKEND_SUBSCRIPTION_ID` | Subscription containing state storage | Azure Portal | Optional |
 
 ### 🏗️ GitHub Environments Setup
 
@@ -207,7 +209,7 @@ You must create the following GitHub Environments in your repository settings:
 2. Click "New environment"
 3. Enter environment name (e.g., `dev`)
 4. Configure protection rules (required reviewers for prod)
-5. Add all 8 secrets for that environment
+5. Add the environment secrets and variables listed above
 6. Repeat for each environment
 
 ### 🗄️ Azure Storage Account Setup (Manual Prerequisite)
@@ -269,7 +271,7 @@ terraform init \\
   -backend-config=\"resource_group_name=${{ vars.BACKEND_RESOURCE_GROUP }}\" \\
   -backend-config=\"storage_account_name=${{ vars.BACKEND_STORAGE_ACCOUNT }}\" \\
   -backend-config=\"container_name=${{ vars.BACKEND_CONTAINER_NAME }}\" \\
-  -backend-config=\"key=${{ BACKEND_KEY }}\"
+  -backend-config=\"key=${{ github.repository }}/${{ inputs.target_env }}.tfstate\"
 ```
 
 **Backend Type:** Azure Storage Account
@@ -279,6 +281,9 @@ terraform init \\
 - Enables team collaboration (prevents concurrent modifications)
 - Provides audit trail of infrastructure changes
 - Keeps sensitive data out of Git repository
+- Uses the deterministic key `<owner>/<repository>/<environment>.tfstate`, preventing one environment from selecting another environment's state.
+
+When adopting this convention for an existing repository, migrate its current state to the generated key before updating the workflow reference. Retain the prior blob until a successful plan verifies the new backend.
 
 ### 📁 Environment-Specific Variables (Optional)
 

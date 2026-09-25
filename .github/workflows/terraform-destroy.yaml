@@ -56,6 +56,11 @@ jobs:
     name: Destroy (${{ inputs.target_env }})
     runs-on: ${{ fromJSON(inputs.custom_runner || '["ubuntu-latest"]') }}
     environment: ${{ inputs.target_env }}
+    env:
+      ARM_USE_OIDC: true
+      ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+      ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID || vars.AZURE_SUBSCRIPTION_ID }}
+      ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
     steps:
       - name: Display Warning
         run: |
@@ -124,11 +129,7 @@ jobs:
           else
             echo "✅ BACKEND_CONTAINER_NAME exists"
           fi
-          if [ -z "${{ vars.BACKEND_KEY }}" ]; then
-            echo "⚠️ BACKEND_KEY does NOT exist"
-          else
-            echo "✅ BACKEND_KEY exists"
-          fi
+          echo "✅ Backend key: ${{ github.repository }}/${{ inputs.target_env }}.tfstate"
 
       - name: Set TF_VAR environment variables
         run: |
@@ -153,15 +154,11 @@ jobs:
             UPGRADE_FLAG="-upgrade"
           fi
           terraform init $UPGRADE_FLAG \
-            $( [ -z "${{ secrets.BACKEND_SUBSCRIPTION_ID }}" ] || echo -backend-config="subscription_id=${{ secrets.BACKEND_SUBSCRIPTION_ID }}" ) \
+            $( [ -z "${{ vars.BACKEND_SUBSCRIPTION_ID }}" ] || echo -backend-config="subscription_id=${{ vars.BACKEND_SUBSCRIPTION_ID }}" ) \
             -backend-config="resource_group_name=${{ vars.BACKEND_RESOURCE_GROUP }}" \
             -backend-config="storage_account_name=${{ vars.BACKEND_STORAGE_ACCOUNT }}" \
             -backend-config="container_name=${{ vars.BACKEND_CONTAINER_NAME }}" \
-            -backend-config="key=${{ vars.BACKEND_KEY }}"
-        env:
-          ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
-          ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID || vars.AZURE_SUBSCRIPTION_ID }}
-          ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+            -backend-config="key=${{ github.repository }}/${{ inputs.target_env }}.tfstate"
 
       - name: Terraform Destroy Plan
         working-directory: ${{ inputs.terraform_directory }}

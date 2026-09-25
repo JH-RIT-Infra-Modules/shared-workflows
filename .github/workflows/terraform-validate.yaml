@@ -11,7 +11,7 @@ on:
         description: 'Terraform version to use'
         required: false
         type: string
-        default: '1.14.5'
+        default: '1.16.2'
       tf_vars:
         description: 'JSON object of TF_VAR_ environment variables (e.g., {"foo": "bar"})'
         required: false
@@ -28,9 +28,15 @@ on:
         type: boolean
         default: false
       custom_runner:
-        description: 'Run on self-hosted runner with this label instead of ubuntu-latest'
+        description: 'JSON array of runner labels, for example ["self-hosted", "azure-terraform"]'
         required: false
         type: string
+        default: '["self-hosted", "azure-terraform"]'
+      run_without_runner_caches:
+        description: 'Run build.sh without runner cache environment variables'
+        required: false
+        type: boolean
+        default: false
 
 env:
   TF_VERSION: ${{ inputs.terraform_version }}
@@ -39,8 +45,13 @@ env:
 jobs:
   validate:
     name: Validate (${{ inputs.target_env }})
-    runs-on: ${{ inputs.custom_runner || 'ubuntu-latest' }}
+    runs-on: ${{ fromJSON(inputs.custom_runner || '["ubuntu-latest"]') }}
     environment: ${{ inputs.target_env }}
+    env:
+      ARM_USE_OIDC: true
+      ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+      ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID || vars.AZURE_SUBSCRIPTION_ID }}
+      ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
     steps:
       - name: Display Environment Info
         run: |
@@ -50,10 +61,28 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
 
+      - name: Run without runner caches
+        if: ${{ inputs.run_without_runner_caches }}
+        run: |
+          env -u TF_PLUGIN_CACHE_DIR \
+              -u NPM_CONFIG_CACHE \
+              -u PIP_CACHE_DIR \
+              -u MAVEN_OPTS \
+              ./build.sh
+
+      - name: Install Azure CLI
+        run: |
+          if ! command -v az >/dev/null 2>&1; then
+            curl -sL https://aka.ms/InstallAzureCLIDeb | bash
+          fi
+          az version
+
       - name: Azure Login
         uses: azure/login@v2
         with:
-          creds: '{"clientId":"${{ secrets.ARM_CLIENT_ID }}","clientSecret":"${{ secrets.ARM_CLIENT_SECRET }}","subscriptionId":"${{ secrets.ARM_SUBSCRIPTION_ID }}","tenantId":"${{ secrets.ARM_TENANT_ID }}"}'
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID || vars.AZURE_SUBSCRIPTION_ID }}
 
       - name: Generate GitHub App Token
         id: app-token
@@ -103,11 +132,7 @@ jobs:
           else
             echo "✅ BACKEND_CONTAINER_NAME exists"
           fi
-          if [ -z "${{ vars.BACKEND_KEY }}" ]; then
-            echo "⚠️ BACKEND_KEY does NOT exist"
-          else
-            echo "✅ BACKEND_KEY exists"
-          fi
+          echo "✅ Backend key: ${{ github.repository }}/${{ inputs.target_env }}.tfstate"
 
       - name: Set TF_VAR environment variables
         run: |
@@ -132,16 +157,11 @@ jobs:
             UPGRADE_FLAG="-upgrade"
           fi
           terraform init $UPGRADE_FLAG \
-            $( [ -z "${{ secrets.BACKEND_SUBSCRIPTION_ID }}" ] || echo -backend-config="subscription_id=${{ secrets.BACKEND_SUBSCRIPTION_ID }}" ) \
+            $( [ -z "${{ vars.BACKEND_SUBSCRIPTION_ID }}" ] || echo -backend-config="subscription_id=${{ vars.BACKEND_SUBSCRIPTION_ID }}" ) \
             -backend-config="resource_group_name=${{ vars.BACKEND_RESOURCE_GROUP }}" \
             -backend-config="storage_account_name=${{ vars.BACKEND_STORAGE_ACCOUNT }}" \
             -backend-config="container_name=${{ vars.BACKEND_CONTAINER_NAME }}" \
-            -backend-config="key=${{ vars.BACKEND_KEY }}"
-        env:
-          ARM_CLIENT_ID: ${{ secrets.ARM_CLIENT_ID }}
-          ARM_CLIENT_SECRET: ${{ secrets.ARM_CLIENT_SECRET }}
-          ARM_SUBSCRIPTION_ID: ${{ secrets.ARM_SUBSCRIPTION_ID }}
-          ARM_TENANT_ID: ${{ secrets.ARM_TENANT_ID }}
+            -backend-config="key=${{ github.repository }}/${{ inputs.target_env }}.tfstate"
 
       - name: Terraform Format Check
         working-directory: ${{ inputs.terraform_directory }}

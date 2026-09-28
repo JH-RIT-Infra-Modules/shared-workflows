@@ -129,7 +129,7 @@ jobs:
           else
             echo "✅ BACKEND_CONTAINER_NAME exists"
           fi
-          echo "✅ Backend key: ${{ github.repository }}/${{ inputs.target_env }}.tfstate"
+          echo "✅ Backend key: ${{ inputs.target_env }}.${{ github.repository }}.tfstate"
 
       - name: Set TF_VAR environment variables
         run: |
@@ -158,7 +158,7 @@ jobs:
             -backend-config="resource_group_name=${{ vars.BACKEND_RESOURCE_GROUP }}" \
             -backend-config="storage_account_name=${{ vars.BACKEND_STORAGE_ACCOUNT }}" \
             -backend-config="container_name=${{ vars.BACKEND_CONTAINER_NAME }}" \
-            -backend-config="key=${{ github.repository }}/${{ inputs.target_env }}.tfstate"
+            -backend-config="key=${{ inputs.target_env }}.${{ github.repository }}.tfstate"
 
       - name: Terraform Destroy Plan
         working-directory: ${{ inputs.terraform_directory }}

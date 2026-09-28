@@ -132,7 +132,7 @@ jobs:
           else
             echo "✅ BACKEND_CONTAINER_NAME exists"
           fi
-          echo "✅ Backend key: ${{ inputs.target_env }}.${{ github.repository }}.tfstate"
+          echo "✅ Backend key: ${{ github.event.repository.name }}/${{ inputs.target_env }}.tfstate"
 
       - name: Set TF_VAR environment variables
         run: |
@@ -161,7 +161,7 @@ jobs:
             -backend-config="resource_group_name=${{ vars.BACKEND_RESOURCE_GROUP }}" \
             -backend-config="storage_account_name=${{ vars.BACKEND_STORAGE_ACCOUNT }}" \
             -backend-config="container_name=${{ vars.BACKEND_CONTAINER_NAME }}" \
-            -backend-config="key=${{ inputs.target_env }}.${{ github.repository }}.tfstate"
+            -backend-config="key=${{ github.event.repository.name }}/${{ inputs.target_env }}.tfstate"
 
       - name: Terraform Plan
         id: plan
@@ -293,7 +293,7 @@ jobs:
             -backend-config="resource_group_name=${{ vars.BACKEND_RESOURCE_GROUP }}" \
             -backend-config="storage_account_name=${{ vars.BACKEND_STORAGE_ACCOUNT }}" \
             -backend-config="container_name=${{ vars.BACKEND_CONTAINER_NAME }}" \
-            -backend-config="key=${{ inputs.target_env }}.${{ github.repository }}.tfstate"
+            -backend-config="key=${{ github.event.repository.name }}/${{ inputs.target_env }}.tfstate"
 
       - name: Download Plan
         uses: actions/download-artifact@v4

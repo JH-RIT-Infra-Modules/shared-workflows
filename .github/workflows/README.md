@@ -481,6 +481,7 @@ Generate and execute Terraform execution plans across multiple environments in p
 |-------|-------------|----------|---------|----------|
 | `environments` | Comma-separated list or "all" | Yes | `dev` | `dev,test,stage,prod` or `all` |
 | `run_deploy` | Whether to run the apply job | Yes | `false` | `true` |
+| `audit_to_log_analytics` | Publish apply/destroy identity and approval records to Log Analytics | No | `false` | `true` |
 
 ### 📋 Jobs
 
@@ -556,6 +557,52 @@ create azurerm_app_service.example
 - ✅ **No Automatic Deploy:** Requires explicit `run_deploy=true`
 - ✅ **Fail-Fast Disabled:** One environment failure doesn't stop others
 
+### Durable Deployment Audit (Opt-In)
+
+Set `audit_to_log_analytics: true` when calling the Terraform apply or destroy reusable workflow. Each run writes an event to the configured Log Analytics custom table and adds the same information to the GitHub run summary. The event includes the GitHub initiator and ID, rerun-triggering actor, commit/ref, environment, run URL/attempt, Azure subscription/client ID, result, and approved GitHub environment reviewers.
+
+Configure these GitHub Environment variables for every environment used by the workflow (including `<environment>-destroy` where applicable):
+
+| Variable | Value |
+|----------|-------|
+| `AUDIT_DCR_ENDPOINT` | Data Collection Endpoint or DCR logs-ingestion endpoint URL |
+| `AUDIT_DCR_IMMUTABLE_ID` | Data Collection Rule immutable ID |
+| `AUDIT_DCR_STREAM` | Input stream name, for example `Custom-GitHubDeployAudit` |
+
+The DCR must accept a stream with these columns and types, and route it to a custom Log Analytics table:
+
+| Column | Type |
+|--------|------|
+| `TimeGenerated` | datetime |
+| `Action`, `Repository`, `RepositoryId`, `Environment` | string |
+| `Initiator`, `InitiatorId`, `TriggeringActor` | string |
+| `CommitSha`, `Ref`, `RunId`, `RunUrl`, `Workflow`, `Result` | string |
+| `RunAttempt` | int |
+| `AzureSubscriptionId`, `AzureClientId`, `ApprovalsJson` | string |
+
+Grant the Azure deployment service principal the **Monitoring Metrics Publisher** role scoped to the DCR. Also configure an Azure Monitor diagnostic setting to export the subscription Activity Log to the same workspace; those native resource-operation records remain attributed to the service principal and can be correlated with these run events by time, subscription, and client ID.
+
+The calling workflow must permit the reusable job's required token scopes:
+
+```yaml
+permissions:
+  actions: read
+  contents: read
+  id-token: write
+```
+
+Example reusable-workflow call:
+
+```yaml
+- uses: JH-RIT-Infra-Modules/shared-workflows/.github/workflows/terraform-plan-deploy.yaml@main
+  with:
+    target_env: prod
+    run_deploy: true
+    audit_to_log_analytics: true
+```
+
+Audit is disabled by default to preserve compatibility with existing callers. When enabled, a missing DCR setting or failed GitHub approval lookup / Log Analytics ingestion fails the audit step, making the gap visible in the run result.
+
 ### 📈 Workflow Diagram
 
 ```
@@ -603,6 +650,7 @@ This workflow is **IRREVERSIBLE**. Once executed, all Azure resources in the sel
 |-------|-------------|----------|----------|
 | `environments` | Comma-separated list or "all" | Yes | `dev,test` or `all` |
 | `confirm_destroy` | Must type "DESTROY" exactly | Yes | `DESTROY` |
+| `audit_to_log_analytics` | Publish the destroy audit record to Log Analytics | No | `false` |
 
 ### 📋 Jobs
 

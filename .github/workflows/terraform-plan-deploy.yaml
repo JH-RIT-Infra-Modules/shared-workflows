@@ -12,6 +12,11 @@ on:
         required: false
         type: boolean
         default: false
+      audit_to_log_analytics:
+        description: 'Send apply audit events to the configured Log Analytics custom table'
+        required: false
+        type: boolean
+        default: false
       terraform_version:
         description: 'Terraform version to use'
         required: false
@@ -219,6 +224,10 @@ jobs:
     needs: [plan]
     if: ${{ inputs.run_deploy == true }}
     environment: ${{ inputs.target_env }}
+    permissions:
+      actions: read
+      contents: read
+      id-token: write
     env:
       ARM_USE_OIDC: true
       ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
@@ -302,8 +311,72 @@ jobs:
           path: ${{ inputs.terraform_directory }}
 
       - name: Terraform Apply
+        id: terraform_apply
         working-directory: ${{ inputs.terraform_directory }}
         run: |
           echo "⚡ Applying Terraform changes for ${{ inputs.target_env }}..."
           terraform apply -auto-approve tfplan
           echo "✅ Deployment complete for ${{ inputs.target_env }}"
+
+      - name: Publish deployment audit event
+        if: ${{ always() && inputs.audit_to_log_analytics }}
+        env:
+          AUDIT_DCR_ENDPOINT: ${{ vars.AUDIT_DCR_ENDPOINT }}
+          AUDIT_DCR_IMMUTABLE_ID: ${{ vars.AUDIT_DCR_IMMUTABLE_ID }}
+          AUDIT_DCR_STREAM: ${{ vars.AUDIT_DCR_STREAM }}
+          AUDIT_RESULT: ${{ steps.terraform_apply.outcome || 'skipped' }}
+          GH_TRIGGERING_ACTOR: ${{ github.triggering_actor }}
+          GH_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TARGET_ENV: ${{ inputs.target_env }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "$AUDIT_DCR_ENDPOINT" ] || [ -z "$AUDIT_DCR_IMMUTABLE_ID" ] || [ -z "$AUDIT_DCR_STREAM" ]; then
+            echo "Log Analytics audit is enabled, but one or more AUDIT_DCR_* environment variables are missing." >&2
+            exit 1
+          fi
+
+          approvals=$(curl --fail --silent --show-error \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            "$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/approvals" |
+            jq -c '[.[] | select(.state == "approved") | {login: .user.login, user_id: .user.id, environments: [.environments[].name]}]')
+
+          event=$(jq -n \
+            --arg timeGenerated "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            --arg action "terraform-apply" \
+            --arg repository "$GITHUB_REPOSITORY" \
+            --arg repositoryId "$GITHUB_REPOSITORY_ID" \
+            --arg environment "$TARGET_ENV" \
+            --arg initiator "$GITHUB_ACTOR" \
+            --arg initiatorId "$GITHUB_ACTOR_ID" \
+            --arg triggeringActor "$GH_TRIGGERING_ACTOR" \
+            --arg commitSha "$GITHUB_SHA" \
+            --arg ref "$GITHUB_REF" \
+            --arg runId "$GITHUB_RUN_ID" \
+            --argjson runAttempt "$GITHUB_RUN_ATTEMPT" \
+            --arg runUrl "$GH_RUN_URL" \
+            --arg workflow "$GITHUB_WORKFLOW" \
+            --arg result "$AUDIT_RESULT" \
+            --arg subscriptionId "$ARM_SUBSCRIPTION_ID" \
+            --arg clientId "$ARM_CLIENT_ID" \
+            --arg approvalsJson "$approvals" \
+            '[{"TimeGenerated": $timeGenerated, "Action": $action, "Repository": $repository, "RepositoryId": $repositoryId, "Environment": $environment, "Initiator": $initiator, "InitiatorId": $initiatorId, "TriggeringActor": $triggeringActor, "CommitSha": $commitSha, "Ref": $ref, "RunId": $runId, "RunAttempt": $runAttempt, "RunUrl": $runUrl, "Workflow": $workflow, "Result": $result, "AzureSubscriptionId": $subscriptionId, "AzureClientId": $clientId, "ApprovalsJson": $approvalsJson}]')
+
+          echo "## Deployment audit" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Action: terraform-apply ($TARGET_ENV)" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Result: $AUDIT_RESULT" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Initiated by: $GITHUB_ACTOR (GitHub ID $GITHUB_ACTOR_ID)" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Triggering actor: $GH_TRIGGERING_ACTOR" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Commit: $GITHUB_SHA" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Approvals: $approvals" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Run: $GH_RUN_URL" >> "$GITHUB_STEP_SUMMARY"
+
+          access_token=$(az account get-access-token --resource https://monitor.azure.com/ --query accessToken --output tsv)
+          curl --fail-with-body --silent --show-error \
+            -X POST \
+            -H "Authorization: Bearer $access_token" \
+            -H "Content-Type: application/json" \
+            --data-binary "$event" \
+            "${AUDIT_DCR_ENDPOINT%/}/dataCollectionRules/$AUDIT_DCR_IMMUTABLE_ID/streams/$AUDIT_DCR_STREAM?api-version=2023-01-01"

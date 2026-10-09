@@ -17,16 +17,6 @@ on:
         required: false
         type: boolean
         default: false
-      plan_run_id:
-        description: 'Workflow run ID that produced the Terraform plan artifact'
-        required: false
-        type: string
-        default: ''
-      plan_commit_sha:
-        description: 'Commit SHA associated with the Terraform plan artifact'
-        required: false
-        type: string
-        default: ''
       terraform_version:
         description: 'Terraform version to use'
         required: false
@@ -89,8 +79,6 @@ jobs:
 
       - name: Checkout code
         uses: actions/checkout@v3
-        with:
-          ref: ${{ inputs.plan_commit_sha || github.sha }}
 
       - name: Run without runner caches
         if: ${{ inputs.run_without_runner_caches }}
@@ -318,8 +306,6 @@ jobs:
         with:
           name: tfplan-${{ inputs.target_env }}
           path: ${{ inputs.terraform_directory }}
-          github-token: ${{ github.token }}
-          run-id: ${{ inputs.plan_run_id || github.run_id }}
 
       - name: Terraform Apply
         working-directory: ${{ inputs.terraform_directory }}

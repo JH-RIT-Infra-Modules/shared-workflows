@@ -1,0 +1,52 @@
+name: Terraform Approval
+
+on:
+  workflow_call:
+    inputs:
+      target_env:
+        description: 'Target environment for the deployment approval'
+        required: true
+        type: string
+      approvers:
+        description: 'Comma-separated GitHub users or a GitHub Team slug; defaults to TERRAFORM_APPROVERS'
+        required: false
+        type: string
+        default: ''
+      minimum_approvals:
+        description: 'Minimum approvals required to continue'
+        required: false
+        type: number
+        default: 1
+
+jobs:
+  approval:
+    name: Approval (${{ inputs.target_env }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    environment: ${{ inputs.target_env }}
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - name: Verify approvers are configured
+        if: ${{ inputs.approvers == '' && vars.TERRAFORM_APPROVERS == '' }}
+        run: |
+          echo "TERRAFORM_APPROVERS must be set on the ${{ inputs.target_env }} environment."
+          exit 1
+
+      - name: Generate GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.APP_ID }}
+          private-key: ${{ secrets.APP_PRIVATE_KEY }}
+
+      - name: Wait for approval
+        uses: trstringer/manual-approval@fa642940caf8412403569b28b2db4a1df08a83a3
+        with:
+          secret: ${{ steps.app-token.outputs.token }}
+          approvers: ${{ inputs.approvers || vars.TERRAFORM_APPROVERS }}
+          minimum-approvals: ${{ inputs.minimum_approvals }}
+          issue-title: "Approve Terraform deploy to ${{ inputs.target_env }}"
+          issue-body: "Review the Terraform plan artifact for ${{ inputs.target_env }}, then approve or deny this deployment."
+          exclude-workflow-initiator-as-approver: true

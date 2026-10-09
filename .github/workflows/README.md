@@ -2,11 +2,12 @@
 
 ## 📋 Overview
 
-This project uses GitHub Actions to automate Terraform infrastructure deployment to Azure. The CI/CD pipeline consists of three main workflows that support **multi-environment parallel execution**:
+This project uses GitHub Actions to automate Terraform infrastructure deployment to Azure. The CI/CD pipeline consists of reusable workflows that support **multi-environment parallel execution**:
 
 1. **`validate.yaml`** - Validates and lints Terraform code across all environments (dev, test, stage, prod)
 2. **`plan-deploy.yaml`** - Plans and applies Terraform changes across selected environments
-3. **`destroy.yaml`** - Destroys infrastructure in selected environments (manual trigger with confirmation)
+3. **`terraform-approval.yaml`** - Creates an issue and waits for manual approval before deployment
+4. **`destroy.yaml`** - Destroys infrastructure in selected environments (manual trigger with confirmation)
 
 All workflows:
 - ✅ Use **matrix strategy** for parallel execution across environments
@@ -190,6 +191,7 @@ To add a new runner, add an object to this list and deploy with Terraform.
 | `BACKEND_STORAGE_ACCOUNT` | Storage Account name for state | Azure Portal | ✅ Required |
 | `BACKEND_CONTAINER_NAME` | Container name in storage account | Azure Portal | ✅ Required |
 | `BACKEND_SUBSCRIPTION_ID` | Subscription containing state storage | Azure Portal | Optional |
+| `TERRAFORM_APPROVERS` | Comma-separated GitHub users or a GitHub Team slug | GitHub | Required for manual approval |
 
 ### 🏗️ GitHub Environments Setup
 
@@ -199,18 +201,25 @@ You must create the following GitHub Environments in your repository settings:
 
 | Environment | Purpose | Protection Rules |
 |-------------|---------|------------------|
-| `dev` | Development validation, planning, and apply | Optional |
-| `test` | Test validation, planning, and apply | Optional |
-| `stage` | Staging validation, planning, and apply | Recommended: Required reviewers |
-| `prod` | Production validation, planning, and apply | **Required: Required reviewers** |
+| `dev` | Development validation, planning, approval, and apply | No required reviewers |
+| `test` | Test validation, planning, approval, and apply | No required reviewers |
+| `stage` | Staging validation, planning, approval, and apply | No required reviewers |
+| `prod` | Production validation, planning, approval, and apply | No required reviewers |
 
 **To create environments:**
 1. Go to Repository → Settings → Environments
 2. Click "New environment"
 3. Enter the target environment name (for example, `dev`)
 4. Add the Azure credentials and backend variables listed above
-5. Configure required reviewers for environments that require an apply gate (for example, `prod`)
-6. Repeat for each target environment
+5. Set `TERRAFORM_APPROVERS` to a comma-separated list of GitHub users or a GitHub Team slug
+6. Do not configure required reviewers; `terraform-approval.yaml` provides the manual gate
+7. Repeat for each target environment
+
+### 👥 Manual Approval Prerequisites
+
+`terraform-approval.yaml` creates an approval issue and waits for the configured approvers to comment with an approval keyword. It uses the environment's `APP_ID` and `APP_PRIVATE_KEY` to create a GitHub App token.
+
+When `TERRAFORM_APPROVERS` names a GitHub Team, the GitHub App must be installed in the caller organization with **Organization members: Read-only** and **Issues: Read and write** permissions. GitHub App tokens expire after one hour, so approvals must be completed within the workflow's 55-minute timeout.
 
 ### 🗄️ Azure Storage Account Setup (Manual Prerequisite)
 

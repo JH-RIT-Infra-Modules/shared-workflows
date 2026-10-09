@@ -19,7 +19,6 @@ These shared workflows provide a standardized CI/CD pipeline for Terraform infra
 | `validate.yaml` | Validates Terraform code (linting, formatting, syntax) across all environments |
 | `plan-deploy.yaml` | Generates plans and deploys infrastructure to selected environments |
 | `destroy.yaml` | Destroys infrastructure in selected environments (requires confirmation) |
-| `terraform-approval.yaml` | Opens an issue and waits for manual deployment approval |
 
 ## 📖 Documentation
 

@@ -195,24 +195,22 @@ To add a new runner, add an object to this list and deploy with Terraform.
 
 You must create the following GitHub Environments in your repository settings:
 
-**Required Environments (8 total):**
+**Required Environments (4 total):**
 
 | Environment | Purpose | Protection Rules |
 |-------------|---------|------------------|
-| `dev-plan`, `test-plan`, `stage-plan`, `prod-plan` | Validation and planning credentials | No required reviewers |
-| `dev` | Development apply | Optional |
-| `test` | Test apply | Optional |
-| `stage` | Staging apply | Recommended: Required reviewers |
-| `prod` | Production apply | **Required: Required reviewers** |
+| `dev` | Development validation, planning, and apply | Optional |
+| `test` | Test validation, planning, and apply | Optional |
+| `stage` | Staging validation, planning, and apply | Recommended: Required reviewers |
+| `prod` | Production validation, planning, and apply | **Required: Required reviewers** |
 
 **To create environments:**
 1. Go to Repository → Settings → Environments
 2. Click "New environment"
-3. Create each `<target>-plan` environment (for example, `prod-plan`) without required reviewers
-4. Copy the Azure credentials and backend variables to its matching `<target>-plan` environment
-5. Configure required reviewers on the apply environment (for example, `prod`)
-6. Add the same Azure credentials and backend variables to the apply environment
-7. Repeat for each target environment
+3. Enter the target environment name (for example, `dev`)
+4. Add the Azure credentials and backend variables listed above
+5. Configure required reviewers for environments that require an apply gate (for example, `prod`)
+6. Repeat for each target environment
 
 ### 🗄️ Azure Storage Account Setup (Manual Prerequisite)
 
@@ -436,7 +434,7 @@ Parses the environment input and prepares the matrix.
 
 **Runs On:** `ubuntu-latest` (4 parallel jobs)
 
-**Environment:** `${{ inputs.plan_environment || format('{0}-plan', inputs.target_env) }}` (pulls unprotected planning credentials)
+**Environment:** `${{ inputs.target_env }}` (pulls environment-specific credentials)
 
 **Steps per environment:**
 
@@ -493,7 +491,7 @@ Parses the environment input and prepares the matrix for parallel execution.
 
 **Runs On:** `ubuntu-latest` (up to 4 parallel jobs)
 
-**Environment:** `${{ inputs.plan_environment || format('{0}-plan', inputs.target_env) }}` (pulls unprotected planning credentials)
+**Environment:** `${{ inputs.target_env }}` (pulls environment-specific credentials)
 
 **Steps per environment:**
 

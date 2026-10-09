@@ -49,4 +49,4 @@ jobs:
           minimum-approvals: ${{ inputs.minimum_approvals }}
           issue-title: "Approve Terraform deploy to ${{ inputs.target_env }}"
           issue-body: "Review the Terraform plan artifact for ${{ inputs.target_env }}, then approve or deny this deployment."
-          exclude-workflow-initiator-as-approver: true
+          exclude-workflow-initiator-as-approver: false

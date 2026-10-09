@@ -7,6 +7,16 @@ on:
         description: 'Target environment for this workflow (e.g., dev, test, stage, prod)'
         required: false
         type: string
+      plan_environment:
+        description: 'Unprotected environment used for planning; defaults to <target_env>-plan'
+        required: false
+        type: string
+        default: ''
+      run_plan:
+        description: 'Should the Terraform plan job run?'
+        required: false
+        type: boolean
+        default: true
       run_deploy:
         description: 'Should the TF Apply Job Run?'
         required: false
@@ -55,8 +65,9 @@ env:
 jobs:
   plan:
     name: Plan (${{ inputs.target_env }})
+    if: ${{ inputs.run_plan }}
     runs-on: ${{ fromJSON(inputs.custom_runner || '["ubuntu-latest"]') }}
-    environment: ${{ inputs.target_env }}
+    environment: ${{ inputs.plan_environment || format('{0}-plan', inputs.target_env) }}
     env:
       ARM_USE_OIDC: true
       ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
@@ -217,7 +228,7 @@ jobs:
     name: Apply (${{ inputs.target_env }})
     runs-on: ${{ fromJSON(inputs.custom_runner || '["ubuntu-latest"]') }}
     needs: [plan]
-    if: ${{ inputs.run_deploy == true }}
+    if: ${{ always() && inputs.run_deploy == true && (needs.plan.result == 'success' || needs.plan.result == 'skipped') }}
     environment: ${{ inputs.target_env }}
     env:
       ARM_USE_OIDC: true

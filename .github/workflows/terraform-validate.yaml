@@ -7,6 +7,11 @@ on:
         description: 'Target environment for this workflow (e.g., dev, test, stage, prod)'
         required: false
         type: string
+      plan_environment:
+        description: 'Unprotected environment used for validation; defaults to <target_env>-plan'
+        required: false
+        type: string
+        default: ''
       terraform_version:
         description: 'Terraform version to use'
         required: false
@@ -46,7 +51,7 @@ jobs:
   validate:
     name: Validate (${{ inputs.target_env }})
     runs-on: ${{ fromJSON(inputs.custom_runner || '["ubuntu-latest"]') }}
-    environment: ${{ inputs.target_env }}
+    environment: ${{ inputs.plan_environment || format('{0}-plan', inputs.target_env) }}
     env:
       ARM_USE_OIDC: true
       ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}

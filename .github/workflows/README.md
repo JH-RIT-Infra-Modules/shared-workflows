@@ -199,18 +199,20 @@ You must create the following GitHub Environments in your repository settings:
 
 | Environment | Purpose | Protection Rules |
 |-------------|---------|------------------|
-| `dev` | Development deployments | Optional |
-| `test` | Test deployments | Optional |
-| `stage` | Staging deployments | Recommended: Required reviewers |
-| `prod` | Production deployments | **Required: Required reviewers** |
+| `dev-plan`, `test-plan`, `stage-plan`, `prod-plan` | Validation and planning credentials | No required reviewers |
+| `dev` | Development apply | Optional |
+| `test` | Test apply | Optional |
+| `stage` | Staging apply | Recommended: Required reviewers |
+| `prod` | Production apply | **Required: Required reviewers** |
 
 **To create environments:**
 1. Go to Repository → Settings → Environments
 2. Click "New environment"
-3. Enter environment name (e.g., `dev`)
-4. Configure protection rules (required reviewers for prod)
-5. Add the environment secrets and variables listed above
-6. Repeat for each environment
+3. Create each `<target>-plan` environment (for example, `prod-plan`) without required reviewers
+4. Copy the Azure credentials and backend variables to its matching `<target>-plan` environment
+5. Configure required reviewers on the apply environment (for example, `prod`)
+6. Add the same Azure credentials and backend variables to the apply environment
+7. Repeat for each target environment
 
 ### 🗄️ Azure Storage Account Setup (Manual Prerequisite)
 
@@ -434,7 +436,7 @@ Parses the environment input and prepares the matrix.
 
 **Runs On:** `ubuntu-latest` (4 parallel jobs)
 
-**Environment:** `${{ matrix.environment }}` (pulls environment-specific secrets)
+**Environment:** `${{ inputs.plan_environment || format('{0}-plan', inputs.target_env) }}` (pulls unprotected planning credentials)
 
 **Steps per environment:**
 
@@ -491,7 +493,7 @@ Parses the environment input and prepares the matrix for parallel execution.
 
 **Runs On:** `ubuntu-latest` (up to 4 parallel jobs)
 
-**Environment:** `${{ matrix.environment }}` (pulls environment-specific secrets)
+**Environment:** `${{ inputs.plan_environment || format('{0}-plan', inputs.target_env) }}` (pulls unprotected planning credentials)
 
 **Steps per environment:**
 
@@ -530,7 +532,7 @@ create azurerm_app_service.example
 
 **Depends On:** `setup` and `plan` jobs
 
-**Environment:** `${{ matrix.environment }}` (may require approval for stage/prod)
+**Environment:** `${{ inputs.target_env }}` (may require approval for stage/prod)
 
 **Condition:** Only runs if `run_deploy=true`
 
@@ -548,7 +550,7 @@ create azurerm_app_service.example
 
 ### 🔒 Safety Features
 
-- ✅ **Environment-Specific Approval:** Each environment can have its own approval requirements
+- ✅ **Apply-Only Approval:** The target environment can require approval after planning completes
 - ✅ **Parallel Execution:** All environments planned/deployed simultaneously
 - ✅ **Isolation:** Each environment uses its own secrets and state
 - ✅ **Plan Reuse:** Uses stored plan per environment

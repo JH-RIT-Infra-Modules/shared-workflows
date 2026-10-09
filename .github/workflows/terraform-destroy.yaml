@@ -169,9 +169,9 @@ jobs:
             OVERRIDE_FLAG="${{ inputs.command_override }}"
           fi
           if [ -f "environments/${{ inputs.target_env }}.tfvars" ]; then
-            terraform plan -destroy $OVERRIDE_FLAG -var-file="environments/${{ inputs.target_env }}.tfvars" -out=tfdestroy
+            terraform plan -destroy -refresh=false $OVERRIDE_FLAG -var-file="environments/${{ inputs.target_env }}.tfvars" -out=tfdestroy
           else
-            terraform plan -destroy $OVERRIDE_FLAG -out=tfdestroy
+            terraform plan -destroy -refresh=false $OVERRIDE_FLAG -out=tfdestroy
           fi
 
       - name: Terraform Destroy

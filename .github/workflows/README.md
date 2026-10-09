@@ -626,7 +626,7 @@ This workflow is **IRREVERSIBLE**. Once executed, all Azure resources in the sel
 | 3. Setup Terraform | `hashicorp/setup-terraform@v2` | Terraform v1.5.0 ready |
 | 4. Azure Login | `azure/login@v2` | Authenticated with env credentials |
 | 5. Terraform Init | `terraform init` | Backend initialized for environment |
-| 6. Destroy Plan | `terraform plan -destroy -var-file=environments/<env>.tfvars -out=tfdestroy` | Shows what will be deleted |
+| 6. Destroy Plan | `terraform plan -destroy -refresh=false -var-file=environments/<env>.tfvars -out=tfdestroy` | Shows what will be deleted without refreshing remote resources |
 | 7. Execute Destroy | `terraform apply -auto-approve tfdestroy` | **🗑️ Deletes All Resources** |
 
 ### 🔒 Safety Features
